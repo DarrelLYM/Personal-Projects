@@ -53,12 +53,20 @@ function mealForNow() {
 }
 
 let toastTimer;
-function toast(msg) {
+// A short message at the bottom. With an action (e.g. Undo) it shows a button and stays a little longer.
+function toast(msg, action) {
   const t = $("#toast");
   t.textContent = msg;
+  t.classList.toggle("has-action", !!action);
+  if (action) {
+    const b = document.createElement("button");
+    b.textContent = action.label;
+    b.addEventListener("click", () => { t.classList.remove("show"); action.run(); }, { once: true });
+    t.append(b);
+  }
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+  toastTimer = setTimeout(() => t.classList.remove("show"), action ? 5000 : 2600);
 }
 
 const ICON = {
@@ -373,10 +381,12 @@ function renderMeals() {
         <button class="add-btn" data-add="${m.id}" aria-label="Add to ${m.name}">${ICON.plus}</button>
       </div>
       ${entries.length ? `<ul class="entries">${entries.map((e) => `
-        <li class="entry">
-          <button class="e-main e-edit" data-edit="${m.id}:${esc(e.id)}" aria-label="Edit ${esc(e.name)}"><div class="e-name">${esc(e.name)}</div><div class="e-meta">${entryMeta(e)}</div></button>
-          <div class="e-right"><div class="e-kcal">${fmt(num(e.kcal) * (num(e.qty) || 1))}</div>${hasPrice(e) ? `<div class="e-price">${money(num(e.price))}</div>` : ""}</div>
-          <button class="e-del" data-del="${m.id}:${esc(e.id)}" aria-label="Remove ${esc(e.name)}">${ICON.trash}</button>
+        <li class="swipe-row" data-row="${m.id}:${esc(e.id)}">
+          <div class="swipe-bg" aria-hidden="true"><span class="sb-label">${ICON.trash}<b class="sb-hint">Delete</b><b class="sb-go">Release to delete</b></span></div>
+          <div class="entry">
+            <button class="e-main e-edit" data-edit="${m.id}:${esc(e.id)}" aria-label="Edit ${esc(e.name)} (swipe left to delete)"><div class="e-name">${esc(e.name)}</div><div class="e-meta">${entryMeta(e)}</div></button>
+            <div class="e-right"><div class="e-kcal">${fmt(num(e.kcal) * (num(e.qty) || 1))}</div>${hasPrice(e) ? `<div class="e-price">${money(num(e.price))}</div>` : ""}</div>
+          </div>
         </li>`).join("")}</ul>` : ""}
     </div>`;
   }).join("");
@@ -580,7 +590,70 @@ function addEntries(mealId, entries, dateKey = ymd(state.selectedDate)) {
 function removeEntry(mealId, id) {
   const dateKey = ymd(state.selectedDate);
   const day = dayData(dateKey);
-  writeDay(dateKey, { ...day, [mealId]: day[mealId].filter((e) => e.id !== id) }).then(() => toast("Removed")).catch(() => {});
+  const idx = day[mealId].findIndex((e) => e.id === id);
+  if (idx < 0) return;
+  const removed = day[mealId][idx];
+  writeDay(dateKey, { ...day, [mealId]: day[mealId].filter((e) => e.id !== id) }).catch(() => {});
+  toast(`Removed ${removed.name}`, { label: "Undo", run: () => {
+    const now = dayData(dateKey);
+    if (now[mealId].some((e) => e.id === id)) return;
+    const list = [...now[mealId]];
+    list.splice(Math.min(idx, list.length), 0, removed);
+    writeDay(dateKey, { ...now, [mealId]: list }).catch(() => {});
+  } });
+}
+
+// Swipe a logged food to the left to delete it. A red "Delete" strip shows underneath while dragging;
+// letting go past the threshold deletes (with Undo), otherwise it springs back.
+function enableSwipeDelete(root) {
+  let st = null;
+  const THRESH = 0.38;
+  const reset = (row, animate = true) => {
+    const card = row.querySelector(".entry");
+    card.style.transition = animate ? "" : "none";
+    card.style.transform = "";
+    row.classList.remove("swiping", "armed");
+  };
+  root.addEventListener("pointerdown", (e) => {
+    const row = e.target.closest(".swipe-row");
+    if (!row || (e.pointerType === "mouse" && e.button !== 0)) return;
+    st = { row, card: row.querySelector(".entry"), x0: e.clientX, y0: e.clientY, dx: 0, on: false, id: e.pointerId, w: row.offsetWidth };
+  });
+  root.addEventListener("pointermove", (e) => {
+    if (!st || e.pointerId !== st.id) return;
+    const dx = e.clientX - st.x0, dy = e.clientY - st.y0;
+    if (!st.on) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (Math.abs(dy) > Math.abs(dx) || dx > 0) { st = null; return; } // a scroll or a right swipe
+      st.on = true;
+      st.card.style.transition = "none";
+      st.row.classList.add("swiping");
+      try { st.row.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    }
+    st.dx = Math.min(0, dx);
+    st.card.style.transform = `translateX(${st.dx}px)`;
+    st.row.classList.toggle("armed", -st.dx > st.w * THRESH);
+  });
+  const finish = (e) => {
+    if (!st || (e && e.pointerId !== st.id)) return;
+    const { row, card, dx, on, w } = st;
+    st = null;
+    if (!on) return;
+    row.dataset.swiped = "1"; // swallow the click that follows the drag
+    setTimeout(() => delete row.dataset.swiped, 350);
+    if (-dx > w * THRESH) {
+      card.style.transition = "transform .18s ease-in";
+      card.style.transform = `translateX(${-w - 20}px)`;
+      const [m, id] = row.dataset.row.split(":");
+      setTimeout(() => removeEntry(m, id), 170);
+    } else reset(row);
+  };
+  root.addEventListener("pointerup", finish);
+  root.addEventListener("pointercancel", (e) => { if (st && e.pointerId === st.id) { const r = st.row; st = null; reset(r); } });
+  root.addEventListener("click", (e) => {
+    const row = e.target.closest(".swipe-row");
+    if (row?.dataset.swiped) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
 }
 
 function findEntry(mealId, id) {
@@ -2220,11 +2293,10 @@ function bindEvents() {
 
   $("#weight").addEventListener("click", (e) => { if (e.target.closest("[data-act-main=weight]")) openSheet(null, "weight"); });
   enableSheetDrag();
+  enableSwipeDelete($("#meals"));
   $("#meals").addEventListener("click", (e) => {
     const add = e.target.closest("[data-add]");
     if (add) return openSheet(add.dataset.add, "add");
-    const del = e.target.closest("[data-del]");
-    if (del) { const [m, id] = del.dataset.del.split(":"); removeEntry(m, id); return; }
     const edit = e.target.closest("[data-edit]");
     if (edit) { openSheet(edit.dataset.edit.split(":")[0], "editEntry", edit.dataset.edit); return; }
     const cp = e.target.closest("[data-copyday]");
