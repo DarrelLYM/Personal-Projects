@@ -14,4 +14,4 @@ self.FIREBASE_CONFIG = {
 
 // Web Push public key for notifications (safe to publish).
 // From: Firebase console > Project settings > Cloud Messaging > Web configuration > Web Push certificates > Key pair.
-self.FIREBASE_VAPID_KEY = "PASTE_WEB_PUSH_KEY_HERE";
+self.FIREBASE_VAPID_KEY = "BHe4i77F_viXyrH67h7oqaw0iAdvP9stlg5bFCMdCRpoljYCtPWDWeR5HIhpRI26Mwic3AzScwWc1geHlxkmDo4";
