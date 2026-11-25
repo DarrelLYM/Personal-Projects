@@ -12,7 +12,7 @@ service cloud.firestore {
     }
 
     // Username -> email lookup, so people can sign in with a username.
-    // Anyone can look up a username; only its owner can create or delete it; nobody can take over an existing one.
+    // Anyone can look up a username; only its owner can create, update or delete it; nobody can take over an existing one.
     match /usernames/{name} {
       allow get: if true;
       allow list: if false;
@@ -20,7 +20,11 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['uid', 'email']);
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
-      allow update: if false;
+      // The owner can update the stored email after changing it; nobody can move a username to another account.
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'email']);
     }
   }
 }

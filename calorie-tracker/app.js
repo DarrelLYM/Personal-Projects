@@ -5,7 +5,8 @@
 //   users/{uid}/months/{YYYY-MM} { month, days: { "YYYY-MM-DD": { breakfast[], lunch[], dinner[], supper[] } } }
 //   usernames/{lowercase name}   { uid, email }   lets people sign in with a username
 // One document per user per month: 10 years is about 120 documents per person.
-import { firebaseConfig } from "./firebase-config.js";
+const firebaseConfig = self.FIREBASE_CONFIG;      // set in firebase-config.js
+const VAPID_KEY = self.FIREBASE_VAPID_KEY || ""; // Web Push public key, also in firebase-config.js
 
 const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
 const MEALS = [
@@ -99,8 +100,15 @@ async function loadFirebase() {
     db = fs.getFirestore(fbApp);
   }
   Object.assign(fb, {
-    db,
+    app: fbApp, db,
     onAuthStateChanged: auth.onAuthStateChanged,
+    reauth: (user, email, pw) => auth.reauthenticateWithCredential(user, auth.EmailAuthProvider.credential(email, pw)),
+    verifyBeforeUpdateEmail: auth.verifyBeforeUpdateEmail,
+    sendSignInLink: auth.sendSignInLinkToEmail,
+    isSignInLink: auth.isSignInWithEmailLink,
+    signInWithLink: auth.signInWithEmailLink,
+    deleteUser: auth.deleteUser,
+    listMonths: () => fs.getDocs(fs.collection(db, `${userPath()}/months`)),
     signIn: auth.signInWithEmailAndPassword,
     signUp: auth.createUserWithEmailAndPassword,
     sendReset: auth.sendPasswordResetEmail,
@@ -145,7 +153,9 @@ function writeDay(dateKey, day) {
 
 function updateProfile(patch) {
   if (!state.profile) return Promise.resolve();
-  state.profile = { ...state.profile, ...patch };
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  const merge = (a, b) => { const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = isObj(v) && isObj(o[k]) ? merge(o[k], v) : v; return o; };
+  state.profile = merge(state.profile, patch); // same deep merge Firestore applies
   const path = userPath();
   return queueWrite(path, () => fb.setDoc(fb.doc(path), patch, { merge: true }));
 }
@@ -164,6 +174,7 @@ function subscribeProfile() {
     if (snap.exists()) {
       state.profile = snap.data();
       renderAll();
+      if (!snap.metadata.fromCache && !state.profileChecked) { state.profileChecked = true; afterProfileLoad(); }
       return;
     }
     if (state.signingUp || snap.metadata.fromCache) return;
@@ -195,6 +206,7 @@ function ensureMonthSubs() {
 
 function stopSubscriptions() {
   state.profileUnsub?.(); state.profileUnsub = null;
+  state.profileChecked = false;
   for (const unsub of state.monthSubs.values()) unsub();
   state.monthSubs.clear();
   state.months = {};
@@ -905,6 +917,10 @@ const VIEWS = {
         <div><span>Username</span><b>${esc(p.username || "")}</b></div>
         <div><span>Email</span><b>${esc(state.user?.email || p.email || "")}</b></div>
       </div>
+      <div class="row2">
+        <button class="secondary" data-act="edit-username">Change username</button>
+        <button class="secondary" data-act="edit-email">Change email</button>
+      </div>
       <div class="section-label">Daily goals</div>
       <div class="form">
         ${f("gKcal", "Calories (kcal)", g.kcal)}
@@ -917,11 +933,19 @@ const VIEWS = {
       <button class="secondary" id="autoGoals">Set protein, carbs and fat from my calorie goal</button>
       <p class="note">HPB's guide for adults is under about 40–50g of added sugar and under 2,000mg of sodium a day.</p>
       <button class="primary" id="saveGoals">Save goals</button>
+      <div class="section-label">Notifications</div>
+      <div class="kv"><div><span>Reminders</span><b>${esc(notifySummary())}</b></div></div>
+      <button class="secondary" data-act="notifications">Notification settings</button>
+      <div class="section-label">Your data</div>
+      <button class="secondary" style="margin-top:0" id="exportCsv">Download my log as a spreadsheet (CSV)</button>
+      <button class="secondary" id="backupJson">Download a full backup</button>
+      <button class="secondary" data-act="restore">Restore from a backup</button>
       <div class="section-label">Password</div>
-      <button class="secondary" id="resetPw">Email me a link to change my password</button>
+      <button class="secondary" style="margin-top:0" id="resetPw">Email me a link to change my password</button>
       <div class="section-label">This day</div>
-      <button class="secondary danger" id="clearDay">Clear everything logged on ${state.selectedDate.toLocaleDateString("en-SG", { day: "numeric", month: "short" })}</button>
+      <button class="secondary danger" style="margin-top:0" id="clearDay">Clear everything logged on ${state.selectedDate.toLocaleDateString("en-SG", { day: "numeric", month: "short" })}</button>
       <button class="secondary" id="signOutBtn" style="margin-top:22px">Sign out</button>
+      <button class="secondary danger" data-act="delete-account">Delete my account</button>
       <p class="note">${window.SG_FOODS.length} Singapore foods built in. Values are typical portions from HPB and brand data; hawker portions vary by stall.</p>`;
     $("#autoGoals", body).addEventListener("click", () => {
       const a = goalsFor(num($("#gKcal", body).value) || 1800);
@@ -932,6 +956,8 @@ const VIEWS = {
       const goalsNew = { kcal: v("gKcal") || 1800, protein: v("gProtein"), carbs: v("gCarbs"), fat: v("gFat"), sugar: v("gSugar"), sodium: v("gSodium") };
       try { await updateProfile({ goals: goalsNew }); renderAll(); closeSheet(); toast("Goals saved"); } catch { /* toast shown */ }
     });
+    $("#exportCsv", body).addEventListener("click", (e) => withBusy(e.target, exportCsv));
+    $("#backupJson", body).addEventListener("click", (e) => withBusy(e.target, downloadBackup));
     $("#resetPw", body).addEventListener("click", async (e) => {
       e.target.disabled = true;
       try { await sendReset(state.user.email); toast(`Link sent to ${state.user.email}`); } catch { toast("Couldn't send the email. Try again later."); e.target.disabled = false; }
@@ -941,6 +967,179 @@ const VIEWS = {
       closeSheet(); toast("Day cleared");
     });
     $("#signOutBtn", body).addEventListener("click", async () => { closeSheet(); await fb.signOut(fb.auth); });
+  },
+
+  editUsername(body) {
+    $("#sheetTitle").textContent = "Change username";
+    renderMealTabs(false);
+    body.innerHTML = `
+      <div class="field"><label for="nuName">New username</label><input id="nuName" autocomplete="off" autocapitalize="none" spellcheck="false" value="${esc(state.profile?.username || "")}"><div class="hint">3–20 letters, numbers, dots, dashes or underscores. It can't already be used by someone else.</div></div>
+      <button class="primary" id="nuSave">Save username</button>
+      <p class="form-msg err" id="nuMsg" hidden></p>`;
+    $("#nuSave", body).addEventListener("click", async (e) => {
+      const msg = $("#nuMsg", body);
+      msg.hidden = true;
+      e.target.disabled = true;
+      try { await changeUsername($("#nuName", body).value.trim()); closeSheet(); toast("Username changed"); }
+      catch (err) { msg.textContent = err.message || "Couldn't change the username. Try again."; msg.hidden = false; e.target.disabled = false; }
+    });
+  },
+
+  editEmail(body) {
+    $("#sheetTitle").textContent = "Change email";
+    renderMealTabs(false);
+    body.innerHTML = `
+      <p class="note" style="margin-top:0">We'll send a confirmation link to your <b>new</b> email. Your email only changes after you open that link. Your current email also gets a message with a way to undo it.</p>
+      <div class="field" style="margin-top:12px"><label for="neEmail">New email</label><input id="neEmail" type="email" autocomplete="email" autocapitalize="none" spellcheck="false"></div>
+      <div class="field" style="margin-top:12px"><label for="nePw">Current password</label><input id="nePw" type="password" autocomplete="current-password"><div class="hint">Needed to confirm it's you.</div></div>
+      <button class="primary" id="neSend">Send confirmation link</button>
+      <p class="form-msg" id="neMsg" hidden></p>`;
+    $("#neSend", body).addEventListener("click", async (e) => {
+      const msg = $("#neMsg", body);
+      msg.hidden = true;
+      e.target.disabled = true;
+      try {
+        const to = await requestEmailChange($("#neEmail", body).value.trim(), $("#nePw", body).value);
+        msg.className = "form-msg ok";
+        msg.textContent = `Confirmation link sent to ${to}. Open it to finish the change (check spam too). After that, sign in with your new email once, then your username works again as usual.`;
+      } catch (err) {
+        msg.className = "form-msg err";
+        msg.textContent = err.message || authError(err);
+        e.target.disabled = false;
+      }
+      msg.hidden = false;
+    });
+  },
+
+  deleteAccount(body) {
+    $("#sheetTitle").textContent = "Delete my account";
+    renderMealTabs(false);
+    const email = state.user?.email || "";
+    body.innerHTML = `
+      <p class="note" style="margin-top:0;font-size:14px;color:var(--ink-2)">Deleting your account erases your login, profile, goals, saved foods and your whole food log. It can't be undone.</p>
+      <p class="note" style="font-size:14px;color:var(--ink-2)">To make sure it's really you, we'll email a confirmation link to <b>${esc(email)}</b>. Open it to finish deleting. If you don't open it, nothing happens.</p>
+      <button class="secondary" id="delBackup">Download a backup first</button>
+      <button class="primary" id="delSend" style="background:var(--over)">Email me the delete link</button>
+      <p class="form-msg" id="delMsg" hidden></p>`;
+    $("#delBackup", body).addEventListener("click", (e) => withBusy(e.target, downloadBackup));
+    $("#delSend", body).addEventListener("click", async (e) => {
+      const msg = $("#delMsg", body);
+      e.target.disabled = true;
+      try {
+        await requestDeletionLink(email);
+        msg.className = "form-msg ok";
+        msg.textContent = `Link sent to ${email}. Open it on any device to confirm. Check your spam folder if you don't see it.`;
+      } catch (err) {
+        msg.className = "form-msg err";
+        msg.textContent = err?.code === "auth/operation-not-allowed"
+          ? "Email links aren't turned on in Firebase yet (Authentication > Sign-in method > Email/Password > Email link). See the README."
+          : authError(err);
+        e.target.disabled = false;
+      }
+      msg.hidden = false;
+    });
+  },
+
+  restore(body) {
+    $("#sheetTitle").textContent = "Restore from a backup";
+    renderMealTabs(false);
+    body.innerHTML = `
+      <p class="note" style="margin-top:0;font-size:14px;color:var(--ink-2)">Pick a backup file you downloaded from this app. Days in the backup replace the same days in your log. Days that aren't in the backup are left alone. Your goals and saved foods are restored too.</p>
+      <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+      <button class="primary" id="restorePick">Choose backup file</button>
+      <div id="restoreOut"></div>`;
+    const input = $("#restoreFile", body);
+    $("#restorePick", body).addEventListener("click", () => input.click());
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      input.value = "";
+      if (!file) return;
+      const out = $("#restoreOut", body);
+      let backup;
+      try { backup = parseBackup(await file.text()); }
+      catch (err) { out.innerHTML = `<p class="form-msg err">${esc(err.message)}</p>`; return; }
+      const months = Object.keys(backup.months);
+      const days = months.reduce((n, m) => n + Object.keys(backup.months[m].days || {}).length, 0);
+      out.innerHTML = `<p class="form-msg ok">Backup of <b>${esc(backup.profile?.username || "an account")}</b> from ${esc(new Date(backup.exportedAt).toLocaleString("en-SG"))}: ${days} logged day${days === 1 ? "" : "s"} across ${months.length} month${months.length === 1 ? "" : "s"}.</p>
+        <button class="primary" id="restoreGo">Restore this backup</button>`;
+      armButton($("#restoreGo", body), "Tap again to restore", async () => {
+        out.innerHTML = '<div class="spinner"></div><p class="scan-status">Restoring…</p>';
+        try { await restoreBackup(backup); closeSheet(); toast("Backup restored"); }
+        catch (err) { console.error(err); out.innerHTML = '<p class="form-msg err">Couldn\'t finish restoring. Check your connection and try again; it\'s safe to run it again.</p>'; }
+      });
+    });
+  },
+
+  notifications(body) {
+    $("#sheetTitle").textContent = "Notifications";
+    renderMealTabs(false);
+    const n = notifySettings();
+    const hourOpts = (sel, from = 0, to = 23) => Array.from({ length: to - from + 1 }, (_, i) => i + from)
+      .map((h) => `<option value="${h}"${h === sel ? " selected" : ""}>${hourLabel(h)}</option>`).join("");
+    const support = pushSupport();
+    body.innerHTML = `
+      ${support.ok ? "" : `<p class="form-msg err" style="margin-top:0">${esc(support.why)}</p>`}
+      <div class="chips" id="nOnOff" style="margin-top:0">
+        <button data-on="0" class="${n.enabled ? "" : "on"}">Off</button>
+        <button data-on="1" class="${n.enabled ? "on" : ""}">On</button>
+      </div>
+      <div id="nOpts"${n.enabled ? "" : " hidden"}>
+        <div class="section-label">Regular reminders</div>
+        <div class="form">
+          <div class="field full"><label for="nEvery">Remind me</label><select id="nEvery" class="sel">
+            ${[[0, "Never"], [1, "Every hour"], [2, "Every 2 hours"], [3, "Every 3 hours"], [4, "Every 4 hours"]].map(([v, l]) => `<option value="${v}"${v === n.every ? " selected" : ""}>${l}</option>`).join("")}
+          </select></div>
+          <div class="field"><label for="nFrom">From</label><select id="nFrom" class="sel">${hourOpts(n.from, 5, 14)}</select></div>
+          <div class="field"><label for="nTo">Until</label><select id="nTo" class="sel">${hourOpts(n.to, 15, 23)}</select></div>
+        </div>
+        <div class="section-label">Meal reminders</div>
+        <p class="note" style="margin-top:0">Only sent if that meal hasn't been logged yet.</p>
+        ${["breakfast", "lunch", "dinner"].map((m) => `
+          <div class="nrow"><label class="check" style="margin:0"><input type="checkbox" id="nm_${m}"${n.meals[m] != null ? " checked" : ""}> ${mealName(m)} not logged by</label>
+          <select id="nmh_${m}" class="sel sel-sm">${hourOpts(n.meals[m] ?? { breakfast: 10, lunch: 14, dinner: 20 }[m], { breakfast: 6, lunch: 11, dinner: 17 }[m], { breakfast: 12, lunch: 16, dinner: 23 }[m])}</select></div>`).join("")}
+        <div class="section-label">End of day</div>
+        <div class="nrow"><label class="check" style="margin:0"><input type="checkbox" id="nEod"${n.eod != null ? " checked" : ""}> Nothing logged today by</label>
+          <select id="nEodH" class="sel sel-sm">${hourOpts(n.eod ?? 21, 17, 23)}</select></div>
+        <p class="note">Reminders are checked once an hour, so they can arrive up to about an hour after the time you pick. They use this phone's time zone (${esc(localTz())}).</p>
+      </div>
+      <button class="primary" id="nSave">Save</button>
+      <button class="secondary" id="nTest"${n.enabled && support.ok ? "" : " hidden"}>Send a test notification to this device</button>
+      <p class="form-msg" id="nMsg" hidden></p>`;
+    let enabled = n.enabled;
+    $("#nOnOff", body).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-on]");
+      if (!b) return;
+      enabled = b.dataset.on === "1";
+      body.querySelectorAll("#nOnOff button").forEach((x) => x.classList.toggle("on", x === b));
+      $("#nOpts", body).hidden = !enabled;
+    });
+    $("#nTest", body).addEventListener("click", async () => {
+      try { await showLocalNotification("Test from Grace's Calorie Tracker", "Notifications are working on this device."); }
+      catch { toast("Couldn't show a notification. Check the app's notification permission in your phone settings."); }
+    });
+    $("#nSave", body).addEventListener("click", async (e) => {
+      const msg = $("#nMsg", body);
+      msg.hidden = true;
+      const pick = (id) => Number($("#" + id, body).value);
+      const next = {
+        enabled, tz: localTz(), every: pick("nEvery"), from: pick("nFrom"), to: pick("nTo"),
+        meals: Object.fromEntries(["breakfast", "lunch", "dinner"].map((m) => [m, $("#nm_" + m, body).checked ? pick("nmh_" + m) : null])),
+        eod: $("#nEod", body).checked ? pick("nEodH") : null,
+      };
+      e.target.disabled = true;
+      try {
+        if (enabled) await registerThisDevice();
+        await updateProfile({ notify: next });
+        closeSheet();
+        toast(enabled ? "Notifications on" : "Notifications off");
+      } catch (err) {
+        console.error(err);
+        msg.className = "form-msg err";
+        msg.textContent = err.message || "Couldn't turn on notifications. Try again.";
+        msg.hidden = false;
+        e.target.disabled = false;
+      }
+    });
   },
 };
 
@@ -1136,6 +1335,11 @@ function bindEvents() {
     else if (act === "custom") show("custom", {});
     else if (act === "custom-q") show("custom", { name: $("#q")?.value || "" });
     else if (act === "custom-barcode") show("custom", { barcode: actEl.dataset.code });
+    else if (act === "edit-username") show("editUsername");
+    else if (act === "edit-email") show("editEmail");
+    else if (act === "notifications") show("notifications");
+    else if (act === "restore") show("restore");
+    else if (act === "delete-account") show("deleteAccount");
   });
 }
 
@@ -1156,9 +1360,17 @@ async function boot() {
     $("#authCard").innerHTML = '<div class="setup"><h2>Can\'t connect</h2><p>The app couldn\'t load. Check your internet connection and reload.</p></div>';
     return;
   }
+  if (fb.isSignInLink(fb.auth, location.href)) state.deleteFlow = true;
   fb.onAuthStateChanged(fb.auth, (user) => {
     stopSubscriptions();
     state.user = user;
+    if (state.deleteFlow) {
+      closeSheet();
+      $("#appScreen").hidden = true;
+      $("#authScreen").hidden = false;
+      if (!state.deleteStarted) { state.deleteStarted = true; deleteFlowStart(); }
+      return;
+    }
     if (!user) {
       closeSheet();
       $("#appScreen").hidden = true;
@@ -1174,4 +1386,300 @@ async function boot() {
   });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+// ---------- After sign-in housekeeping ----------
+async function afterProfileLoad() {
+  // Email changed through a confirmation link: keep the profile and username lookup in step.
+  const email = state.user?.email;
+  const p = state.profile;
+  if (email && p && p.email !== email) {
+    try {
+      await updateProfile({ email });
+      if (p.username) await fb.setDoc(fb.doc(`usernames/${p.username.toLowerCase()}`), { uid: state.user.uid, email }, { merge: true });
+    } catch (e) { console.error(e); }
+  }
+  // Keep this device's notification token fresh.
+  if (notifySettings().enabled && typeof Notification !== "undefined" && Notification.permission === "granted") {
+    registerThisDevice({ quiet: true }).catch((e) => console.warn("push refresh", e));
+  }
+}
+
+const appUrl = () => location.href.split("#")[0].split("?")[0];
+
+async function withBusy(btn, fn) {
+  btn.disabled = true;
+  try { await fn(); } catch (e) { console.error(e); toast("Something went wrong. Check your connection and try again."); }
+  finally { btn.disabled = false; }
+}
+
+// ---------- Username and email changes ----------
+async function changeUsername(name) {
+  if (!/^[A-Za-z0-9_.-]{3,20}$/.test(name)) throw new Error("Usernames are 3–20 letters, numbers, dots, dashes or underscores.");
+  const old = state.profile?.username || "";
+  if (name === old) return;
+  const uidNow = state.user.uid, email = state.user.email;
+  const newKey = name.toLowerCase(), oldKey = old.toLowerCase();
+  if (newKey !== oldKey) {
+    const taken = await fb.getDoc(fb.doc(`usernames/${newKey}`));
+    if (taken.exists()) throw new Error("That username is taken. Pick another one.");
+    await fb.setDoc(fb.doc(`usernames/${newKey}`), { uid: uidNow, email });
+    if (oldKey) await fb.deleteDoc(fb.doc(`usernames/${oldKey}`)).catch((e) => console.warn(e));
+  }
+  await updateProfile({ username: name });
+  renderAll();
+}
+
+async function requestEmailChange(newEmail, password) {
+  const current = state.user.email;
+  if (!newEmail.includes("@")) throw new Error("Enter your new email address.");
+  if (newEmail.toLowerCase() === String(current).toLowerCase()) throw new Error("That's already your email.");
+  if (!password) throw new Error("Enter your current password.");
+  try { await fb.reauth(state.user, current, password); }
+  catch (e) { throw new Error(["auth/invalid-credential", "auth/wrong-password"].includes(e?.code) ? "That password is wrong." : authError(e)); }
+  try { await fb.verifyBeforeUpdateEmail(state.user, newEmail, { url: appUrl() }); }
+  catch (e) {
+    if (String(e?.code).includes("continue-uri") || e?.code === "auth/unauthorized-domain") await fb.verifyBeforeUpdateEmail(state.user, newEmail);
+    else throw new Error(authError(e));
+  }
+  return newEmail;
+}
+
+// ---------- Account deletion (confirmed through an emailed link) ----------
+async function requestDeletionLink(email) {
+  try { localStorage.setItem("gct.deleteEmail", email); } catch { /* optional */ }
+  await fb.sendSignInLink(fb.auth, email, { url: appUrl() + "?confirm=delete", handleCodeInApp: true });
+}
+
+function deleteCard(html) {
+  $("#authCard").innerHTML = html;
+}
+
+function deleteFlowStart() {
+  let saved = "";
+  try { saved = localStorage.getItem("gct.deleteEmail") || ""; } catch { /* optional */ }
+  deleteCard(`
+    <h2>Confirm account deletion</h2>
+    <p class="lead">Enter the email of the account you want to delete.</p>
+    <form id="dfForm" class="stack" novalidate>
+      <div class="field"><label for="dfEmail">Email</label><input id="dfEmail" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" value="${esc(saved)}"></div>
+      <button class="primary" type="submit" id="dfGo" style="margin-top:4px">Continue</button>
+    </form>
+    <p class="form-msg err" id="dfMsg" hidden></p>
+    <div class="auth-links"><button id="dfCancel">Keep my account</button></div>`);
+  $("#dfCancel").addEventListener("click", cancelDeleteFlow);
+  $("#dfForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("#dfEmail").value.trim();
+    $("#dfGo").disabled = true;
+    try {
+      await fb.signInWithLink(fb.auth, email, location.href);
+      deleteConfirmStep();
+    } catch (err) {
+      $("#dfMsg").textContent = err?.code === "auth/invalid-action-code" || err?.code === "auth/expired-action-code"
+        ? "This delete link has expired or was already used. Request a new one from Profile > Delete my account."
+        : err?.code === "auth/invalid-email" ? "That email doesn't match the link. Use the email the link was sent to." : authError(err);
+      $("#dfMsg").hidden = false;
+      $("#dfGo").disabled = false;
+    }
+  });
+}
+
+async function deleteConfirmStep() {
+  const user = fb.auth.currentUser;
+  state.user = user;
+  let username = "";
+  try { const snap = await fb.getDoc(fb.doc(`users/${user.uid}`)); username = snap.exists() ? snap.data().username || "" : ""; } catch { /* shown below */ }
+  deleteCard(`
+    <h2>Delete ${esc(username || user.email)}?</h2>
+    <p class="lead">This erases the login for <b>${esc(user.email)}</b>, the profile, goals, saved foods and the whole food log. It can't be undone.</p>
+    <button class="secondary" id="dcBackup">Download a backup first</button>
+    <button class="primary" id="dcDelete" style="background:var(--over)">Delete forever</button>
+    <p class="form-msg err" id="dcMsg" hidden></p>
+    <div class="auth-links"><button id="dcCancel">Keep my account</button></div>`);
+  $("#dcCancel").addEventListener("click", cancelDeleteFlow);
+  $("#dcBackup").addEventListener("click", (e) => withBusy(e.target, async () => { state.profile = (await fb.getDoc(fb.doc(`users/${user.uid}`))).data() || {}; await downloadBackup(); }));
+  armButton($("#dcDelete"), "Tap again to delete forever", async () => {
+    try {
+      await deleteEverything(user, username);
+      try { localStorage.removeItem("gct.deleteEmail"); } catch { /* optional */ }
+      history.replaceState(null, "", appUrl());
+      deleteCard(`<h2>Account deleted</h2><p class="lead">Everything for ${esc(user.email)} has been erased.</p>
+        <button class="primary" id="dcDone">Back to sign in</button>`);
+      $("#dcDone").addEventListener("click", () => location.replace(appUrl()));
+    } catch (err) {
+      console.error(err);
+      $("#dcMsg").textContent = "Couldn't finish deleting. Check your connection and open the link again, or request a new one.";
+      $("#dcMsg").hidden = false;
+    }
+  });
+}
+
+async function deleteEverything(user, username) {
+  const months = await fb.listMonths();
+  for (const d of months.docs) await fb.deleteDoc(fb.doc(`users/${user.uid}/months/${d.id}`));
+  if (username) {
+    const key = username.toLowerCase();
+    const snap = await fb.getDoc(fb.doc(`usernames/${key}`));
+    if (snap.exists() && snap.data().uid === user.uid) await fb.deleteDoc(fb.doc(`usernames/${key}`));
+  }
+  await fb.deleteDoc(fb.doc(`users/${user.uid}`));
+  await fb.deleteUser(user);
+}
+
+function cancelDeleteFlow() {
+  state.deleteFlow = false;
+  history.replaceState(null, "", appUrl());
+  location.replace(appUrl());
+}
+
+// ---------- Export, backup and restore ----------
+function saveFile(name, text, type) {
+  const blob = new Blob([text], { type });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+async function allMonths() {
+  const snap = await fb.listMonths();
+  return snap.docs.map((d) => [d.id, d.data()]).sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+async function exportCsv() {
+  const months = await allMonths();
+  const cell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const rows = [["Date", "Meal", "Food", "Serving", "Servings", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)", "Sugar (g)", "Sodium (mg)", "Source"]];
+  for (const [, m] of months) {
+    for (const date of Object.keys(m.days || {}).sort()) {
+      const d = m.days[date] || {};
+      for (const meal of MEALS) for (const e of d[meal.id] || []) {
+        const q = num(e.qty) || 1;
+        rows.push([date, meal.name, e.name, e.serving, r1(q), r0(e.kcal * q), r1(e.protein * q), r1(e.carbs * q), r1(e.fat * q), r1(e.sugar * q), r0(e.sodium * q), e.source]);
+      }
+    }
+  }
+  if (rows.length === 1) { toast("Nothing logged yet"); return; }
+  saveFile(`food-log-${(state.profile?.username || "me").toLowerCase()}-${todayKey()}.csv`, "﻿" + rows.map((r) => r.map(cell).join(",")).join("\r\n"), "text/csv");
+  toast(`Downloaded ${rows.length - 1} entries`);
+}
+
+async function downloadBackup() {
+  const months = await allMonths();
+  const p = state.profile || {};
+  const backup = {
+    app: "graces-calorie-tracker", version: 1, exportedAt: new Date().toISOString(),
+    profile: { username: p.username || "", goals: p.goals || null, customFoods: p.customFoods || [], recents: p.recents || [] },
+    months: Object.fromEntries(months.map(([id, m]) => [id, { days: m.days || {} }])),
+  };
+  saveFile(`calorie-tracker-backup-${(p.username || "me").toLowerCase()}-${todayKey()}.json`, JSON.stringify(backup), "application/json");
+  toast("Backup downloaded");
+}
+
+function parseBackup(text) {
+  let b;
+  try { b = JSON.parse(text); } catch { throw new Error("That file isn't a backup from this app."); }
+  if (!b || b.app !== "graces-calorie-tracker" || typeof b.months !== "object") throw new Error("That file isn't a backup from this app.");
+  for (const [m, v] of Object.entries(b.months)) {
+    if (!/^\d{4}-\d{2}$/.test(m) || typeof v?.days !== "object") throw new Error("This backup file is damaged.");
+    for (const d of Object.keys(v.days)) if (!d.startsWith(m + "-")) throw new Error("This backup file is damaged.");
+  }
+  return b;
+}
+
+async function restoreBackup(b) {
+  for (const [month, v] of Object.entries(b.months)) {
+    const days = {};
+    for (const [date, day] of Object.entries(v.days)) days[date] = Object.fromEntries(MEALS.map((m) => [m.id, Array.isArray(day?.[m.id]) ? day[m.id] : []]));
+    const path = monthPath(month);
+    await queueWrite(path, () => fb.setDoc(fb.doc(path), { month, days, updatedAt: new Date().toISOString() }, { merge: true }));
+  }
+  const patch = {};
+  if (b.profile?.goals) patch.goals = b.profile.goals;
+  if (Array.isArray(b.profile?.customFoods)) {
+    const mine = state.profile?.customFoods || [];
+    const names = new Set(b.profile.customFoods.map((f) => String(f.name).toLowerCase()));
+    patch.customFoods = [...b.profile.customFoods, ...mine.filter((f) => !names.has(String(f.name).toLowerCase()))].slice(0, 300);
+  }
+  if (Object.keys(patch).length) await updateProfile(patch);
+  state.months = {};
+  for (const unsub of state.monthSubs.values()) unsub();
+  state.monthSubs.clear();
+  renderAll();
+}
+
+// ---------- Notifications ----------
+const localTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Singapore"; } catch { return "Asia/Singapore"; } };
+const hourLabel = (h) => (h === 0 ? "12am" : h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h - 12}pm`);
+
+function notifySettings() {
+  const n = state.profile?.notify || {};
+  return {
+    enabled: !!n.enabled, every: num(n.every), from: n.from ?? 9, to: n.to ?? 22,
+    meals: { breakfast: n.meals?.breakfast ?? null, lunch: n.meals?.lunch ?? null, dinner: n.meals?.dinner ?? null },
+    eod: n.eod === undefined ? 21 : n.eod, tokens: Array.isArray(n.tokens) ? n.tokens : [],
+  };
+}
+
+function notifySummary() {
+  const n = notifySettings();
+  if (!n.enabled) return "Off";
+  const parts = [];
+  if (n.every) parts.push(n.every === 1 ? "hourly" : `every ${n.every}h`);
+  const meals = Object.values(n.meals).filter((v) => v != null).length;
+  if (meals) parts.push(`${meals} meal${meals > 1 ? "s" : ""}`);
+  if (n.eod != null) parts.push(`end of day ${hourLabel(n.eod)}`);
+  return parts.length ? "On: " + parts.join(", ") : "On";
+}
+
+const isStandalone = () => window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+function pushSupport() {
+  if (!VAPID_KEY || /PASTE/i.test(VAPID_KEY)) return { ok: false, why: "Notifications aren't set up yet: the Web Push key is missing from firebase-config.js. See the README." };
+  if (isIos() && !isStandalone()) return { ok: false, why: "On iPhone, notifications only work in the app added to your Home Screen (iOS 16.4 or newer). Add it from Safari's Share menu, open it from the icon, then turn notifications on there." };
+  if (!("serviceWorker" in navigator) || typeof Notification === "undefined" || !("PushManager" in window)) return { ok: false, why: "This browser doesn't support notifications. Try Chrome on Android, or the Home Screen app on iPhone." };
+  if (Notification.permission === "denied") return { ok: false, why: "Notifications are blocked for this app. Allow them in your phone or browser settings, then come back here." };
+  return { ok: true };
+}
+
+let messagingMod = null, messagingInst = null;
+async function getMessaging() {
+  if (!messagingMod) messagingMod = await import(FB + "firebase-messaging.js");
+  if (!(await messagingMod.isSupported())) throw new Error("This browser doesn't support notifications.");
+  if (!messagingInst) {
+    messagingInst = messagingMod.getMessaging(fb.app);
+    messagingMod.onMessage(messagingInst, (payload) => {
+      const d = payload?.data || payload?.notification || {};
+      if (d.title || d.body) toast(d.body || d.title);
+    });
+  }
+  return messagingInst;
+}
+
+async function registerThisDevice({ quiet = false } = {}) {
+  const support = pushSupport();
+  if (!support.ok) throw new Error(support.why);
+  if (!quiet && Notification.permission !== "granted") {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") throw new Error("Notifications weren't allowed. Allow them in your phone or browser settings to get reminders.");
+  }
+  if (Notification.permission !== "granted") return;
+  const messaging = await getMessaging();
+  const reg = await navigator.serviceWorker.register("sw.js");
+  await navigator.serviceWorker.ready;
+  const token = await messagingMod.getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+  if (!token) throw new Error("Couldn't register this device for notifications. Try again.");
+  const tokens = notifySettings().tokens;
+  if (!tokens.includes(token)) await updateProfile({ notify: { tokens: [token, ...tokens].slice(0, 10) } });
+}
+
+async function showLocalNotification(title, body) {
+  const reg = await navigator.serviceWorker.ready;
+  await reg.showNotification(title, { body, icon: "icons/icon-192.png", badge: "icons/icon-192.png", tag: "gct-test" });
+}
+
 boot();

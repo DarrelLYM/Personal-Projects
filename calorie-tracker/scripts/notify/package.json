@@ -1,0 +1,9 @@
+{
+  "name": "calorie-tracker-notify",
+  "private": true,
+  "type": "module",
+  "description": "Hourly reminder sender for Grace's Calorie Tracker (runs on GitHub Actions).",
+  "dependencies": {
+    "firebase-admin": "13.5.0"
+  }
+}

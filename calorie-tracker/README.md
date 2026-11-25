@@ -15,7 +15,10 @@ A free calorie tracker for food eaten in Singapore. It runs in any phone browser
 - **Manual:** search 380 Singapore foods, search packaged products online, or type in your own values
 - **Picks:** local dishes and low-sugar drinks that fit the calories left today
 - **History:** search past foods (e.g. "bubble tea") over 7 days, 30 days, this month, this year or all time, or see daily totals and the most-eaten foods
-- **Profile:** edit your own daily goals, reset your password, sign out
+- **Profile:** edit daily goals; change username (instant) or email (confirmed by a link sent to the new address); reset password; sign out
+- **Notifications** (optional, per person): every 1–4 hours within chosen hours, meal reminders if a meal isn't logged by a set time, and an end-of-day reminder if nothing was logged. Sent hourly by a free GitHub Actions job.
+- **Your data:** download the log as a spreadsheet (CSV), download a full backup, restore from a backup
+- **Delete account:** confirmed through a link emailed to the account's address; erases the login and all data
 
 ## One-time setup (about 10 minutes)
 
@@ -33,17 +36,32 @@ A free calorie tracker for food eaten in Singapore. It runs in any phone browser
 2. Repo **Settings** > **Pages** > Source: Deploy from a branch > Branch: `main`, folder `/ (root)` > Save.
 3. After a minute or two the app is live at `https://darrellym.github.io/Personal-Projects/calorie-tracker/`.
 
-### 3. Create the accounts and install on phones
+### 3. Turn on email links (needed for "Delete my account")
+Authentication > **Sign-in method** > click **Email/Password** > switch on **Email link (passwordless sign-in)** > Save.
+
+### 4. Set up notifications (optional; needed for reminders)
+1. **Web Push key:** Project settings > **Cloud Messaging** tab > *Web configuration* > **Web Push certificates** > **Generate key pair**. Copy the key pair (a long string starting with `B`) into `FIREBASE_VAPID_KEY` in [`firebase-config.js`](firebase-config.js). This key is public.
+2. **Service account key:** Project settings > **Service accounts** tab > **Generate new private key** > Generate key. A `.json` file downloads. **This one is secret:** never commit it, send it to anyone, or paste it into chat.
+3. **Give it to GitHub:** repo **Settings** > **Secrets and variables** > **Actions** > **New repository secret**. Name: `FIREBASE_SERVICE_ACCOUNT`. Secret: open the `.json` file in a text editor and paste all of it. Click **Add secret**, then delete the downloaded file.
+4. **Test it:** repo **Actions** tab > **Calorie tracker reminders** > **Run workflow**. A green tick means it worked. After that it runs every hour by itself.
+
+### 5. Create the accounts and install on phones
 1. Open the link and tap **Create an account**. Each person makes their own, with a password of at least 6 characters.
 2. **iPhone:** open the link in Safari > Share > **Add to Home Screen**. **Android:** open it in Chrome > ⋮ menu > **Add to Home screen** (or **Install app**).
 3. On a new phone, open the link and sign in. Everything is still there.
+
+## Notifications: how they work
+- Each person turns them on in **Profile > Notification settings**. Their phone is registered with Firebase Cloud Messaging (free) and the settings are saved in their profile.
+- `.github/workflows/notify.yml` runs every hour (free on public repos). It runs `scripts/notify/notify.mjs`, which checks each person's settings and today's log in their time zone, and sends any reminder that's due. The rules are in `scripts/notify/reminders.mjs`, with tests in `reminders.test.mjs`.
+- Each kind of reminder is sent at most once per time slot. Meal and end-of-day reminders are skipped if food was already logged.
+- **Limits:** GitHub can start the hourly job late when it's busy, so reminders may arrive up to about an hour after the chosen time. iPhones need iOS 16.4+ and the app added to the Home Screen from Safari. GitHub pauses scheduled jobs after 60 days without repo activity; the job re-enables itself each run, but if reminders ever stop, check the **Actions** tab and click **Enable workflow**.
 
 ## How the data is stored
 
 | What | Where |
 |---|---|
 | Logins (email and password) | Firebase Authentication. Passwords are stored by Google in hashed form; nobody can read them, including you |
-| Profile (username, goals, saved foods) | Firestore `users/{userId}` |
+| Profile (username, goals, saved foods, notification settings and device tokens) | Firestore `users/{userId}` |
 | Food log | Firestore `users/{userId}/months/{YYYY-MM}`: one document per month, so 10 years is about 120 per person |
 | Username lookup | Firestore `usernames/{name}`, which maps a username to its email so people can sign in with either |
 | App code | This repo, served by GitHub Pages |
@@ -59,9 +77,10 @@ The security rules let each signed-in person read and write **only their own** p
 
 ## Things to watch
 - **Free plan limits** (Firestore Spark): 1 GiB stored, 50,000 reads and 20,000 writes a day. A couple of people logging daily use well under 1% of this. If a limit is hit, saving pauses until the next day. Nothing is charged unless you upgrade the plan yourself.
-- **Don't delete the Firebase project.** That deletes every account and log. Firestore has no free automatic backup; export from the console if you want one.
+- **Don't delete the Firebase project.** That deletes every account and log. Firestore's automatic backups are a paid feature, so use **Profile > Download a full backup** now and then.
+- **Keep the service account key secret.** It can read and change all data. If it ever leaks: Google Cloud console > IAM & Admin > Service accounts > the firebase-adminsdk account > Keys > delete it, then generate a new one and update the GitHub secret.
 - **Usernames reveal emails:** looking up a username returns its email address, which is how username sign-in works without a paid server. Anyone who knows a username could find its email.
-- **Reset emails** come from `noreply@<project>.firebaseapp.com` and may land in spam.
+- **Firebase emails** (password reset, email change, delete links) come from `noreply@<project>.firebaseapp.com` and may land in spam.
 - **Open Food Facts** is run by volunteers. Some Singapore products are missing or have wrong values; enter those manually once.
 - **The camera needs HTTPS** (GitHub Pages provides it) and permission in the browser. If it's blocked, use "Take a photo instead" or type the barcode number.
 - **Dates follow each phone's clock and time zone.**
@@ -76,3 +95,4 @@ The security rules let each signed-in person read and write **only their own** p
 - `firestore.rules`: database security rules, pasted into the Firebase console
 - `manifest.json`, `sw.js`, `icons/`: home-screen app and offline support
 - `vendor/zxing-browser.js`: barcode reader (`@zxing/browser` 0.1.5, bundled)
+- `scripts/notify/`: hourly reminder job (`firebase-admin`), run by `.github/workflows/notify.yml`
