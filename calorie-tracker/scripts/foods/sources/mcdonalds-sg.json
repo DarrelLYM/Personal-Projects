@@ -1,0 +1,1879 @@
+{
+ "source": "McDonald's Singapore menu item pages (www.mcdonalds.com.sg/food-menu/*)",
+ "accessed": "2026-11-25",
+ "asOf": "Dec 2023",
+ "items": [
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/apple-pie",
+   "name": "Apple Pie",
+   "nutrients": {
+    "kcal": 231.0,
+    "protein": 1.0,
+    "fat": 12.0,
+    "satFat": 6.0,
+    "cholesterol": 1.0,
+    "carbs": 29.0,
+    "fibre": 1.0,
+    "sodium": 185.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/barbeque-sauce",
+   "name": "Barbeque Sauce",
+   "nutrients": {
+    "kcal": 46.8,
+    "protein": 0.3,
+    "fat": 0.2,
+    "satFat": 0.0,
+    "cholesterol": 0.3,
+    "carbs": 11.0,
+    "fibre": 0.1,
+    "sodium": 231.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/big-breakfast",
+   "name": "Big Breakfast®",
+   "nutrients": {
+    "kcal": 496.0,
+    "protein": 27.0,
+    "fat": 22.0,
+    "satFat": 6.0,
+    "cholesterol": 418.0,
+    "carbs": 47.0,
+    "fibre": 5.0,
+    "sodium": 971.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/big-mac",
+   "name": "Big Mac®",
+   "nutrients": {
+    "kcal": 558.0,
+    "protein": 28.0,
+    "fat": 28.0,
+    "satFat": 11.0,
+    "cholesterol": 68.0,
+    "carbs": 48.0,
+    "fibre": 4.0,
+    "sodium": 1321.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/breakfast-deluxe",
+   "name": "Breakfast Deluxe",
+   "nutrients": {
+    "kcal": 805.0,
+    "protein": 31.0,
+    "fat": 29.0,
+    "satFat": 10.0,
+    "cholesterol": 487.0,
+    "carbs": 104.0,
+    "fibre": 6.0,
+    "sodium": 1123.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/breakfast-wrap-chicken-ham",
+   "name": "Breakfast Wrap Chicken Ham",
+   "nutrients": {
+    "kcal": 430.0,
+    "protein": 17.0,
+    "fat": 21.0,
+    "satFat": 8.0,
+    "cholesterol": 222.0,
+    "carbs": 43.0,
+    "fibre": 4.0,
+    "sodium": 1201.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/breakfast-wrap-chicken-sausage",
+   "name": "Breakfast Wrap Chicken Sausage",
+   "nutrients": {
+    "kcal": 472.0,
+    "protein": 22.0,
+    "fat": 24.0,
+    "satFat": 9.0,
+    "cholesterol": 236.0,
+    "carbs": 44.0,
+    "fibre": 5.0,
+    "sodium": 1353.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/buttermilk-chicken-mcwrap",
+   "name": "Buttermilk Chicken McWrap®",
+   "nutrients": {
+    "kcal": 689.7,
+    "protein": 24.2,
+    "fat": 44.1,
+    "satFat": 9.1,
+    "cholesterol": 64.1,
+    "carbs": 50.3,
+    "fibre": 4.5,
+    "sodium": 1542.5
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/buttermilk-chicken-salad",
+   "name": "Buttermilk Chicken Salad",
+   "nutrients": {
+    "kcal": 384.0,
+    "protein": 18.4,
+    "fat": 22.5,
+    "satFat": 3.7,
+    "cholesterol": 61.6,
+    "carbs": 27.1,
+    "fibre": 2.6,
+    "sodium": 727.9
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/buttermilk-crispy-chicken",
+   "name": "Buttermilk Crispy Chicken",
+   "nutrients": {
+    "kcal": 739.0,
+    "protein": 26.0,
+    "fat": 42.0,
+    "satFat": 7.0,
+    "cholesterol": 65.0,
+    "carbs": 64.0,
+    "fibre": 4.0,
+    "sodium": 1422.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/caramel-frappe-medium",
+   "name": "Caramel Frappé",
+   "nutrients": {
+    "kcal": 424.0,
+    "protein": 9.0,
+    "fat": 18.0,
+    "satFat": 11.0,
+    "cholesterol": 0.0,
+    "carbs": 57.0,
+    "fibre": 0.0,
+    "sodium": 356.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/cheeseburger",
+   "name": "Cheeseburger",
+   "nutrients": {
+    "kcal": 303.0,
+    "protein": 16.0,
+    "fat": 12.0,
+    "satFat": 6.0,
+    "cholesterol": 40.0,
+    "carbs": 32.0,
+    "fibre": 2.0,
+    "sodium": 860.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/cheeseburger-delight-500-meal-with-drinking-water",
+   "name": "Cheeseburger Meal with Corn and Ice Mountain",
+   "nutrients": {
+    "kcal": 396.0,
+    "protein": 21.0,
+    "fat": 13.0,
+    "satFat": 6.4,
+    "cholesterol": 141.0,
+    "carbs": 50.0,
+    "fibre": 5.0,
+    "sodium": 810.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chicken-mcnuggets-20pc",
+   "name": "Chicken McNuggets® (20pc)",
+   "nutrients": {
+    "kcal": 910.0,
+    "protein": 46.0,
+    "fat": 54.0,
+    "satFat": 7.0,
+    "cholesterol": 147.0,
+    "carbs": 57.0,
+    "fibre": 4.0,
+    "sodium": 1686.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chicken-mcnuggets-4pc-happy-meal",
+   "name": "Chicken McNuggets® (4pc) Happy Meal®",
+   "nutrients": {
+    "kcal": 204.0,
+    "protein": 10.0,
+    "fat": 12.0,
+    "satFat": 1.0,
+    "cholesterol": 33.0,
+    "carbs": 13.0,
+    "fibre": 1.0,
+    "sodium": 378.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chicken-mcnuggets-6pc",
+   "name": "Chicken McNuggets® (6pc)",
+   "nutrients": {
+    "kcal": 273.0,
+    "protein": 14.0,
+    "fat": 16.0,
+    "satFat": 2.0,
+    "cholesterol": 44.0,
+    "carbs": 17.0,
+    "fibre": 1.0,
+    "sodium": 506.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chicken-mcnuggets-9pc",
+   "name": "Chicken McNuggets® (9pc)",
+   "nutrients": {
+    "kcal": 409.0,
+    "protein": 21.0,
+    "fat": 24.0,
+    "satFat": 3.0,
+    "cholesterol": 66.0,
+    "carbs": 26.0,
+    "fibre": 2.0,
+    "sodium": 759.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chicken-muffin",
+   "name": "Chicken Muffin",
+   "nutrients": {
+    "kcal": 407.0,
+    "protein": 16.0,
+    "fat": 21.0,
+    "satFat": 6.0,
+    "cholesterol": 49.0,
+    "carbs": 38.0,
+    "fibre": 4.0,
+    "sodium": 847.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chicken-muffin-with-egg",
+   "name": "Chicken Muffin with Egg",
+   "nutrients": {
+    "kcal": 481.0,
+    "protein": 23.0,
+    "fat": 26.0,
+    "satFat": 7.0,
+    "cholesterol": 256.0,
+    "carbs": 39.0,
+    "fibre": 4.0,
+    "sodium": 921.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispymix6pc",
+   "name": "McCrispy™ Fried Chicken Mix (6pc)",
+   "nutrients": {
+    "kcal": 2028.0,
+    "protein": 120.0,
+    "fat": 119.0,
+    "satFat": 26.0,
+    "cholesterol": 491.0,
+    "carbs": 120.0,
+    "fibre": 8.0,
+    "sodium": 5617.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispymix6pcbundle",
+   "name": "McCrispy™ Fried Chicken Mix (6pc) Bundle",
+   "nutrients": {
+    "kcal": 2796.0,
+    "protein": 130.0,
+    "fat": 159.0,
+    "satFat": 39.0,
+    "cholesterol": 493.0,
+    "carbs": 211.0,
+    "fibre": 17.0,
+    "sodium": 6147.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispysignature",
+   "name": "McCrispy™ Fried Chicken Signature (2pc)",
+   "nutrients": {
+    "kcal": 590.0,
+    "protein": 39.0,
+    "fat": 33.0,
+    "satFat": 7.0,
+    "cholesterol": 178.0,
+    "carbs": 35.0,
+    "fibre": 2.0,
+    "sodium": 1743.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispysignature6pc",
+   "name": "McCrispy™ Fried Chicken Signature (6pc)",
+   "nutrients": {
+    "kcal": 1908.0,
+    "protein": 122.0,
+    "fat": 108.0,
+    "satFat": 25.0,
+    "cholesterol": 565.0,
+    "carbs": 113.0,
+    "fibre": 5.0,
+    "sodium": 5466.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispysignature6pcbundle",
+   "name": "McCrispy™ Fried Chicken Signature (6pc) Bundle",
+   "nutrients": {
+    "kcal": 2676.0,
+    "protein": 131.0,
+    "fat": 148.0,
+    "satFat": 38.0,
+    "cholesterol": 567.0,
+    "carbs": 204.0,
+    "fibre": 14.0,
+    "sodium": 5996.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispyspicy",
+   "name": "McCrispy™ Fried Chicken Spicy (2pc)",
+   "nutrients": {
+    "kcal": 689.0,
+    "protein": 39.0,
+    "fat": 41.0,
+    "satFat": 8.0,
+    "cholesterol": 135.0,
+    "carbs": 42.0,
+    "fibre": 3.0,
+    "sodium": 1895.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispyspicy6pc",
+   "name": "McCrispy™ Fried Chicken Spicy (6pc)",
+   "nutrients": {
+    "kcal": 2148.0,
+    "protein": 118.0,
+    "fat": 130.0,
+    "satFat": 27.0,
+    "cholesterol": 417.0,
+    "carbs": 126.0,
+    "fibre": 11.0,
+    "sodium": 5769.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chickenmccrispyspicy6pcbundle",
+   "name": "McCrispy™ Fried Chicken Spicy (6pc) Bundle",
+   "nutrients": {
+    "kcal": 2916.0,
+    "protein": 128.0,
+    "fat": 170.0,
+    "satFat": 40.0,
+    "cholesterol": 419.0,
+    "carbs": 218.0,
+    "fibre": 20.0,
+    "sodium": 6298.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/chococone",
+   "name": "ChocoCone®",
+   "nutrients": {
+    "kcal": 281.0,
+    "protein": 3.0,
+    "fat": 16.0,
+    "satFat": 10.0,
+    "cholesterol": 2.0,
+    "carbs": 31.0,
+    "fibre": 1.0,
+    "sodium": 65.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/coca-cola-large",
+   "name": "Coca-Cola® Original Taste Less Sugar (Large)",
+   "nutrients": {
+    "kcal": 221.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 55.0,
+    "fibre": 0.0,
+    "sodium": 15.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/coca-cola-medium",
+   "name": "Coca-Cola® Original Taste Less Sugar (Medium)",
+   "nutrients": {
+    "kcal": 152.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 38.0,
+    "fibre": 0.0,
+    "sodium": 10.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/coca-cola-small",
+   "name": "Coca-Cola® Original Taste Less Sugar (Small)",
+   "nutrients": {
+    "kcal": 109.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 27.0,
+    "fibre": 0.0,
+    "sodium": 7.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/coca-cola-zero-large",
+   "name": "Coca-Cola® Zero Sugar (Large)",
+   "nutrients": {
+    "kcal": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 58.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/coca-cola-zero-medium",
+   "name": "Coca-Cola® Zero Sugar (Medium)",
+   "nutrients": {
+    "kcal": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 40.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/coca-cola-zero-small",
+   "name": "Coca-Cola® Zero Sugar (Small)",
+   "nutrients": {
+    "kcal": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 29.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/corn-cup-3oz",
+   "name": "Corn (Jr)",
+   "nutrients": {
+    "kcal": 66.0,
+    "protein": 2.0,
+    "fat": 1.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 12.0,
+    "fibre": 2.0,
+    "sodium": 67.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/corn-cup-45oz",
+   "name": "Corn",
+   "nutrients": {
+    "kcal": 100.0,
+    "protein": 4.0,
+    "fat": 1.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 18.0,
+    "fibre": 3.0,
+    "sodium": 101.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/curry-sauce",
+   "name": "Curry Sauce",
+   "nutrients": {
+    "kcal": 38.5,
+    "protein": 0.6,
+    "fat": 0.8,
+    "satFat": 0.2,
+    "cholesterol": 0.0,
+    "carbs": 7.3,
+    "fibre": 0.0,
+    "sodium": 183.6
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-cheeseburger",
+   "name": "Double Cheeseburger",
+   "nutrients": {
+    "kcal": 443.0,
+    "protein": 27.0,
+    "fat": 22.0,
+    "satFat": 12.0,
+    "cholesterol": 79.0,
+    "carbs": 34.0,
+    "fibre": 3.0,
+    "sodium": 1360.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-choc-frappe-medium",
+   "name": "Double Chocolate Frappe",
+   "nutrients": {
+    "kcal": 393.0,
+    "protein": 6.0,
+    "fat": 13.0,
+    "satFat": 9.0,
+    "cholesterol": 0.0,
+    "carbs": 60.0,
+    "fibre": 2.0,
+    "sodium": 315.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-filet-o-fish",
+   "name": "Double Filet-O-Fish®",
+   "nutrients": {
+    "kcal": 466.0,
+    "protein": 24.0,
+    "fat": 20.0,
+    "satFat": 8.0,
+    "cholesterol": 64.0,
+    "carbs": 48.0,
+    "fibre": 3.0,
+    "sodium": 756.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-mcspicy",
+   "name": "Double McSpicy®",
+   "nutrients": {
+    "kcal": 833.0,
+    "protein": 38.0,
+    "fat": 46.0,
+    "satFat": 9.0,
+    "cholesterol": 140.0,
+    "carbs": 66.0,
+    "fibre": 6.0,
+    "sodium": 2161.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-mcspicy-with-cheese",
+   "name": "Double McSpicy® with Cheese",
+   "nutrients": {
+    "kcal": 883.0,
+    "protein": 41.0,
+    "fat": 50.0,
+    "satFat": 12.0,
+    "cholesterol": 152.0,
+    "carbs": 67.0,
+    "fibre": 6.0,
+    "sodium": 2331.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-quarter-pounder",
+   "name": "Double Quarter Pounder® with Cheese",
+   "nutrients": {
+    "kcal": 717.0,
+    "protein": 50.0,
+    "fat": 40.0,
+    "satFat": 20.0,
+    "cholesterol": 154.0,
+    "carbs": 39.0,
+    "fibre": 4.0,
+    "sodium": 1698.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-sausage-mcmuffin",
+   "name": "Double Sausage McMuffin®",
+   "nutrients": {
+    "kcal": 327.0,
+    "protein": 23.0,
+    "fat": 13.0,
+    "satFat": 5.0,
+    "cholesterol": 74.0,
+    "carbs": 32.0,
+    "fibre": 5.0,
+    "sodium": 952.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/double-sausage-mcmuffin-with-egg",
+   "name": "Double Sausage McMuffin® with Egg",
+   "nutrients": {
+    "kcal": 406.0,
+    "protein": 30.0,
+    "fat": 18.0,
+    "satFat": 7.0,
+    "cholesterol": 295.0,
+    "carbs": 33.0,
+    "fibre": 5.0,
+    "sodium": 1031.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/drinking-water",
+   "name": "Ice Mountain Drinking Water",
+   "nutrients": {
+    "kcal": 0.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 0.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/egg-mcmuffin",
+   "name": "Egg McMuffin®",
+   "nutrients": {
+    "kcal": 289.0,
+    "protein": 18.0,
+    "fat": 11.0,
+    "satFat": 5.0,
+    "cholesterol": 236.0,
+    "carbs": 29.0,
+    "fibre": 3.0,
+    "sodium": 574.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/filet-o-fish",
+   "name": "Filet-O-Fish®",
+   "nutrients": {
+    "kcal": 332.0,
+    "protein": 15.0,
+    "fat": 13.0,
+    "satFat": 5.0,
+    "cholesterol": 36.0,
+    "carbs": 38.0,
+    "fibre": 2.0,
+    "sodium": 562.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/filet-o-fish-meal-with-drinking-water",
+   "name": "Filet-O-Fish® Meal with Corn and Ice Mountain",
+   "nutrients": {
+    "kcal": 421.0,
+    "protein": 16.0,
+    "fat": 13.0,
+    "satFat": 3.5,
+    "cholesterol": 90.0,
+    "carbs": 42.0,
+    "fibre": 3.0,
+    "sodium": 580.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/filet-o-fish-meal-with-garden-side-salad-and-ice-mountain",
+   "name": "Filet-O-Fish® Meal with Garden Side Salad and Ice Mountain",
+   "nutrients": {
+    "kcal": 351.0,
+    "protein": 16.0,
+    "fat": 13.0,
+    "satFat": 5.0,
+    "cholesterol": 36.0,
+    "carbs": 42.0,
+    "fibre": 3.0,
+    "sodium": 572.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/french-fries-large",
+   "name": "French Fries (Large)",
+   "nutrients": {
+    "kcal": 512.0,
+    "protein": 6.0,
+    "fat": 27.0,
+    "satFat": 8.0,
+    "cholesterol": 1.0,
+    "carbs": 61.0,
+    "fibre": 6.0,
+    "sodium": 314.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/french-fries-medium",
+   "name": "French Fries (Medium)",
+   "nutrients": {
+    "kcal": 384.0,
+    "protein": 5.0,
+    "fat": 20.0,
+    "satFat": 6.0,
+    "cholesterol": 1.0,
+    "carbs": 46.0,
+    "fibre": 5.0,
+    "sodium": 236.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/french-fries-small",
+   "name": "French Fries (Small)",
+   "nutrients": {
+    "kcal": 315.0,
+    "protein": 4.0,
+    "fat": 17.0,
+    "satFat": 5.0,
+    "cholesterol": 1.0,
+    "carbs": 37.0,
+    "fibre": 4.0,
+    "sodium": 193.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/garden-side-salad",
+   "name": "Garden Side Salad",
+   "nutrients": {
+    "kcal": 17.0,
+    "protein": 1.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 4.0,
+    "fibre": 1.0,
+    "sodium": 10.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hamburger",
+   "name": "Hamburger",
+   "nutrients": {
+    "kcal": 253.0,
+    "protein": 14.0,
+    "fat": 8.0,
+    "satFat": 4.0,
+    "cholesterol": 28.0,
+    "carbs": 31.0,
+    "fibre": 2.0,
+    "sodium": 690.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hamburger-meal-with-garden-side-salad-and-ice-mountain",
+   "name": "Hamburger Meal with Garden Side Salad and Ice Mountain",
+   "nutrients": {
+    "kcal": 273.0,
+    "protein": 16.0,
+    "fat": 8.0,
+    "satFat": 4.0,
+    "cholesterol": 28.0,
+    "carbs": 35.0,
+    "fibre": 3.0,
+    "sodium": 699.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/happy-sharing-box-a",
+   "name": "Happy Sharing Box® A",
+   "nutrients": {
+    "kcal": 1730.0,
+    "protein": 101.0,
+    "fat": 109.0,
+    "satFat": 20.0,
+    "cholesterol": 480.0,
+    "carbs": 85.0,
+    "fibre": 6.0,
+    "sodium": 3698.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/happy-sharing-box-b",
+   "name": "Happy Sharing Box® B",
+   "nutrients": {
+    "kcal": 865.0,
+    "protein": 50.0,
+    "fat": 54.0,
+    "satFat": 10.0,
+    "cholesterol": 240.0,
+    "carbs": 43.0,
+    "fibre": 3.0,
+    "sodium": 1849.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hashbrown",
+   "name": "Hash Brown",
+   "nutrients": {
+    "kcal": 149.0,
+    "protein": 1.0,
+    "fat": 8.0,
+    "satFat": 1.0,
+    "cholesterol": 0.0,
+    "carbs": 17.0,
+    "fibre": 1.0,
+    "sodium": 351.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/honey-mustard-sauce",
+   "name": "Honey Mustard Sauce",
+   "nutrients": {
+    "kcal": 119.6,
+    "protein": 0.3,
+    "fat": 10.5,
+    "satFat": 1.5,
+    "cholesterol": 9.6,
+    "carbs": 5.9,
+    "fibre": 0.1,
+    "sodium": 138.2
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hot-fudge-sundae",
+   "name": "Hot Fudge Sundae",
+   "nutrients": {
+    "kcal": 314.0,
+    "protein": 6.0,
+    "fat": 10.0,
+    "satFat": 7.0,
+    "cholesterol": 3.0,
+    "carbs": 49.0,
+    "fibre": 1.0,
+    "sodium": 168.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hot-milo",
+   "name": "Hot MILO®",
+   "nutrients": {
+    "kcal": 192.0,
+    "protein": 5.0,
+    "fat": 4.0,
+    "satFat": 2.0,
+    "cholesterol": 4.0,
+    "carbs": 33.0,
+    "fibre": 2.0,
+    "sodium": 153.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hot-tea",
+   "name": "Hot Tea",
+   "nutrients": {
+    "kcal": 4.0,
+    "protein": 1.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 3.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hotcake-syrup",
+   "name": "Hotcake Syrup",
+   "nutrients": {
+    "kcal": 129.8,
+    "protein": 0.0,
+    "fat": 0.5,
+    "satFat": 0.0,
+    "cholesterol": 0.3,
+    "carbs": 31.4,
+    "fibre": 0.2,
+    "sodium": 16.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hotcakes",
+   "name": "Hotcakes",
+   "nutrients": {
+    "kcal": 557.0,
+    "protein": 9.0,
+    "fat": 18.0,
+    "satFat": 6.0,
+    "cholesterol": 20.0,
+    "carbs": 91.0,
+    "fibre": 3.0,
+    "sodium": 685.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hotcakes-2pc-happy-meal",
+   "name": "Hotcakes (2pc) Happy Meal®",
+   "nutrients": {
+    "kcal": 430.0,
+    "protein": 6.0,
+    "fat": 15.0,
+    "satFat": 5.0,
+    "cholesterol": 14.0,
+    "carbs": 69.0,
+    "fibre": 2.0,
+    "sodium": 501.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/hotcakes-with-sausage",
+   "name": "Hotcakes with Sausage",
+   "nutrients": {
+    "kcal": 619.0,
+    "protein": 16.0,
+    "fat": 21.0,
+    "satFat": 7.0,
+    "cholesterol": 51.0,
+    "carbs": 92.0,
+    "fibre": 4.0,
+    "sodium": 974.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/iced-lemon-tea-medium",
+   "name": "Iced Lemon Tea (Medium)",
+   "nutrients": {
+    "kcal": 91.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 22.0,
+    "fibre": 0.0,
+    "sodium": 15.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/iced-lemon-tea-small",
+   "name": "Iced Lemon Tea (Small)",
+   "nutrients": {
+    "kcal": 66.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 16.0,
+    "fibre": 0.0,
+    "sodium": 11.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/iced-milo-medium",
+   "name": "Iced MILO® (Medium)",
+   "nutrients": {
+    "kcal": 322.0,
+    "protein": 10.0,
+    "fat": 9.0,
+    "satFat": 4.0,
+    "cholesterol": 5.0,
+    "carbs": 51.0,
+    "fibre": 3.0,
+    "sodium": 187.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/iced-milo-small",
+   "name": "Iced MILO® (Small)",
+   "nutrients": {
+    "kcal": 227.0,
+    "protein": 7.0,
+    "fat": 6.0,
+    "satFat": 3.0,
+    "cholesterol": 4.0,
+    "carbs": 36.0,
+    "fibre": 2.0,
+    "sodium": 132.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/jasmine-green-tea-medium",
+   "name": "Jasmine Green Tea (Medium)",
+   "nutrients": {
+    "kcal": 86.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 21.0,
+    "fibre": 0.0,
+    "sodium": 30.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/jasmine-green-tea-small",
+   "name": "Jasmine Green Tea (Small)",
+   "nutrients": {
+    "kcal": 62.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 15.0,
+    "fibre": 0.0,
+    "sodium": 22.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/kiyo-grape-juice",
+   "name": "Kiyo Grape Juice",
+   "nutrients": {
+    "kcal": 100.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 25.0,
+    "fibre": 0.0,
+    "sodium": 25.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/magnolia-lo-fat-hi-calcium-milk",
+   "name": "Low-Fat Hi-Calcium Milk",
+   "nutrients": {
+    "kcal": 96.0,
+    "protein": 7.0,
+    "fat": 3.0,
+    "satFat": 2.0,
+    "cholesterol": 10.0,
+    "carbs": 10.0,
+    "fibre": 0.0,
+    "sodium": 98.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mccafe-americano",
+   "name": "McCafé® Americano",
+   "nutrients": {
+    "kcal": 1.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 0.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mccafe-cappuccino",
+   "name": "McCafé® Cappuccino",
+   "nutrients": {
+    "kcal": 74.0,
+    "protein": 5.0,
+    "fat": 2.0,
+    "satFat": 1.0,
+    "cholesterol": 9.0,
+    "carbs": 8.0,
+    "fibre": 0.0,
+    "sodium": 54.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mccafe-iced-americano",
+   "name": "McCafé® Iced Americano",
+   "nutrients": {
+    "kcal": 1.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 0.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mccafe-iced-latte",
+   "name": "McCafé Iced Latte",
+   "nutrients": {
+    "kcal": 77.0,
+    "protein": 6.0,
+    "fat": 2.0,
+    "satFat": 1.0,
+    "cholesterol": 9.0,
+    "carbs": 9.0,
+    "fibre": 0.0,
+    "sodium": 26.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mccafe-latte",
+   "name": "McCafé® Latte",
+   "nutrients": {
+    "kcal": 97.0,
+    "protein": 10.0,
+    "fat": 3.0,
+    "satFat": 1.0,
+    "cholesterol": 147.0,
+    "carbs": 8.0,
+    "fibre": 0.0,
+    "sodium": 69.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mccafe-premium-roast-coffee",
+   "name": "McCafé® Premium Roast Coffee",
+   "nutrients": {
+    "kcal": 4.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 1.0,
+    "fibre": 0.0,
+    "sodium": 0.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcchicken",
+   "name": "McChicken®",
+   "nutrients": {
+    "kcal": 391.0,
+    "protein": 15.0,
+    "fat": 18.0,
+    "satFat": 3.0,
+    "cholesterol": 38.0,
+    "carbs": 42.0,
+    "fibre": 2.0,
+    "sodium": 751.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcchicken-delight-500-meal-with-drinking-water",
+   "name": "McChicken® Meal with Corn and Ice Mountain",
+   "nutrients": {
+    "kcal": 483.0,
+    "protein": 19.0,
+    "fat": 18.0,
+    "satFat": 3.5,
+    "cholesterol": 41.0,
+    "carbs": 61.0,
+    "fibre": 6.0,
+    "sodium": 860.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcchicken-meal-with-garden-side-salad-and-ice-mountain",
+   "name": "McChicken® Meal with Garden Side Salad and Ice Mountain",
+   "nutrients": {
+    "kcal": 410.0,
+    "protein": 16.0,
+    "fat": 18.0,
+    "satFat": 3.0,
+    "cholesterol": 33.0,
+    "carbs": 47.0,
+    "fibre": 3.0,
+    "sodium": 785.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcchicken-with-cheese",
+   "name": "McChicken® with Cheese",
+   "nutrients": {
+    "kcal": 441.0,
+    "protein": 18.0,
+    "fat": 22.0,
+    "satFat": 6.0,
+    "cholesterol": 50.0,
+    "carbs": 43.0,
+    "fibre": 2.0,
+    "sodium": 921.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcchickenblt",
+   "name": "McChicken® B.L.T",
+   "nutrients": {
+    "kcal": 530.0,
+    "protein": 26.0,
+    "fat": 25.0,
+    "satFat": 5.0,
+    "cholesterol": 85.0,
+    "carbs": 51.0,
+    "fibre": 4.0,
+    "sodium": 1386.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcflurry-oreo",
+   "name": "OREO® McFlurry®",
+   "nutrients": {
+    "kcal": 368.0,
+    "protein": 7.0,
+    "fat": 13.0,
+    "satFat": 6.0,
+    "cholesterol": 5.0,
+    "carbs": 56.0,
+    "fibre": 1.0,
+    "sodium": 221.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcspicy",
+   "name": "McSpicy®",
+   "nutrients": {
+    "kcal": 541.0,
+    "protein": 23.0,
+    "fat": 28.0,
+    "satFat": 6.0,
+    "cholesterol": 76.0,
+    "carbs": 50.0,
+    "fibre": 4.0,
+    "sodium": 1269.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcspicy-with-cheese",
+   "name": "McSpicy® with Cheese",
+   "nutrients": {
+    "kcal": 591.0,
+    "protein": 26.0,
+    "fat": 32.0,
+    "satFat": 8.0,
+    "cholesterol": 88.0,
+    "carbs": 51.0,
+    "fibre": 4.0,
+    "sodium": 1439.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcspicyblt",
+   "name": "McSpicy® B.L.T",
+   "nutrients": {
+    "kcal": 674.0,
+    "protein": 36.0,
+    "fat": 34.0,
+    "satFat": 7.0,
+    "cholesterol": 116.0,
+    "carbs": 58.0,
+    "fibre": 4.0,
+    "sodium": 2025.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mcwings-4pc",
+   "name": "McWings® (4pc)",
+   "nutrients": {
+    "kcal": 603.0,
+    "protein": 35.0,
+    "fat": 41.0,
+    "satFat": 8.0,
+    "cholesterol": 175.0,
+    "carbs": 25.0,
+    "fibre": 3.0,
+    "sodium": 1363.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/mocha-frappe-medium",
+   "name": "Mocha Frappé",
+   "nutrients": {
+    "kcal": 445.0,
+    "protein": 9.0,
+    "fat": 18.0,
+    "satFat": 11.0,
+    "cholesterol": 0.0,
+    "carbs": 61.0,
+    "fibre": 1.0,
+    "sodium": 328.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/oatside-chocolate-flavoured-oatmilk",
+   "name": "Oatside Chocolate Flavoured Oatmilk",
+   "nutrients": {
+    "kcal": 164.0,
+    "protein": 2.6,
+    "fat": 6.2,
+    "satFat": 0.8,
+    "cholesterol": 0.0,
+    "carbs": 24.6,
+    "fibre": 0.0,
+    "sodium": 92.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/oatside-original-flavoured-oatmilk",
+   "name": "Oatside Original Flavoured Oatmilk",
+   "nutrients": {
+    "kcal": 130.0,
+    "protein": 1.2,
+    "fat": 6.4,
+    "satFat": 0.6,
+    "cholesterol": 0.0,
+    "carbs": 16.2,
+    "fibre": 0.0,
+    "sodium": 94.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/quarter-pounder",
+   "name": "Quarter Pounder® with Cheese",
+   "nutrients": {
+    "kcal": 507.0,
+    "protein": 32.0,
+    "fat": 25.0,
+    "satFat": 13.0,
+    "cholesterol": 89.0,
+    "carbs": 38.0,
+    "fibre": 3.0,
+    "sodium": 1265.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/roasted-sesame-dressing",
+   "name": "Roasted Sesame Dressing",
+   "nutrients": {
+    "kcal": 102.0,
+    "protein": 0.6,
+    "fat": 9.1,
+    "satFat": 1.4,
+    "cholesterol": 0.0,
+    "carbs": 3.8,
+    "fibre": 0.5,
+    "sodium": 282.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/sausage-mcmuffin",
+   "name": "Sausage McMuffin®",
+   "nutrients": {
+    "kcal": 258.0,
+    "protein": 16.0,
+    "fat": 9.0,
+    "satFat": 4.0,
+    "cholesterol": 43.0,
+    "carbs": 29.0,
+    "fibre": 4.0,
+    "sodium": 653.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/sausage-mcmuffin-with-egg",
+   "name": "Sausage McMuffin® with Egg",
+   "nutrients": {
+    "kcal": 337.0,
+    "protein": 23.0,
+    "fat": 14.0,
+    "satFat": 6.0,
+    "cholesterol": 264.0,
+    "carbs": 30.0,
+    "fibre": 4.0,
+    "sodium": 732.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/scrambled-egg-burger-with-chicken",
+   "name": "Scrambled Egg Burger with Chicken",
+   "nutrients": {
+    "kcal": 556.0,
+    "protein": 30.0,
+    "fat": 30.0,
+    "satFat": 9.0,
+    "cholesterol": 431.0,
+    "carbs": 40.0,
+    "fibre": 2.0,
+    "sodium": 1050.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/scrambled-egg-burger-with-sausage",
+   "name": "Scrambled Egg Burger with Sausage",
+   "nutrients": {
+    "kcal": 492.0,
+    "protein": 30.0,
+    "fat": 26.0,
+    "satFat": 9.0,
+    "cholesterol": 441.0,
+    "carbs": 33.0,
+    "fibre": 3.0,
+    "sodium": 993.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/spicy-chicken-mcwrap",
+   "name": "Spicy Chicken McWrap®",
+   "nutrients": {
+    "kcal": 545.2,
+    "protein": 22.4,
+    "fat": 33.0,
+    "satFat": 9.8,
+    "cholesterol": 87.2,
+    "carbs": 41.0,
+    "fibre": 4.9,
+    "sodium": 1541.9
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/sprite-large",
+   "name": "Sprite® (Large)",
+   "nutrients": {
+    "kcal": 163.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 40.0,
+    "fibre": 0.0,
+    "sodium": 95.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/sprite-medium",
+   "name": "Sprite® (Medium)",
+   "nutrients": {
+    "kcal": 112.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 27.0,
+    "fibre": 0.0,
+    "sodium": 65.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/sprite-small",
+   "name": "Sprite® (Small)",
+   "nutrients": {
+    "kcal": 80.0,
+    "protein": 0.0,
+    "fat": 0.0,
+    "satFat": 0.0,
+    "cholesterol": 0.0,
+    "carbs": 20.0,
+    "fibre": 0.0,
+    "sodium": 47.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/strawberry-bliss-sundae",
+   "name": "Strawberry Bliss Sundae",
+   "nutrients": {
+    "kcal": 264.0,
+    "protein": 5.0,
+    "fat": 6.0,
+    "satFat": 3.0,
+    "cholesterol": 4.0,
+    "carbs": 47.0,
+    "fibre": 0.0,
+    "sodium": 84.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/strawberry-chococone",
+   "name": "Strawberry ChocoCone®",
+   "nutrients": {
+    "kcal": 283.0,
+    "protein": 3.0,
+    "fat": 16.0,
+    "satFat": 10.0,
+    "cholesterol": 2.0,
+    "carbs": 31.0,
+    "fibre": 1.0,
+    "sodium": 65.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/strawberry-cone",
+   "name": "Strawberry Cone",
+   "nutrients": {
+    "kcal": 134.0,
+    "protein": 3.0,
+    "fat": 4.0,
+    "satFat": 2.0,
+    "cholesterol": 2.0,
+    "carbs": 22.0,
+    "fibre": 0.0,
+    "sodium": 56.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/strawberry-hot-fudge-sundae",
+   "name": "Strawberry Hot Fudge Sundae",
+   "nutrients": {
+    "kcal": 316.0,
+    "protein": 6.0,
+    "fat": 10.0,
+    "satFat": 7.0,
+    "cholesterol": 3.0,
+    "carbs": 49.0,
+    "fibre": 1.0,
+    "sodium": 168.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/strawberry-oreo-mcflurry",
+   "name": "Strawberry OREO® McFlurry®",
+   "nutrients": {
+    "kcal": 343.0,
+    "protein": 6.0,
+    "fat": 12.0,
+    "satFat": 6.0,
+    "cholesterol": 4.0,
+    "carbs": 52.0,
+    "fibre": 1.0,
+    "sodium": 210.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/strawberry-sundae",
+   "name": "Strawberry Sundae",
+   "nutrients": {
+    "kcal": 261.0,
+    "protein": 5.0,
+    "fat": 6.0,
+    "satFat": 3.0,
+    "cholesterol": 4.0,
+    "carbs": 47.0,
+    "fibre": 0.0,
+    "sodium": 84.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/triple-cheeseburger",
+   "name": "Triple Cheeseburger",
+   "nutrients": {
+    "kcal": 580.0,
+    "protein": 38.0,
+    "fat": 32.0,
+    "satFat": 18.0,
+    "cholesterol": 118.0,
+    "carbs": 34.0,
+    "fibre": 4.0,
+    "sodium": 1719.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/vanilla-cone",
+   "name": "Vanilla Cone",
+   "nutrients": {
+    "kcal": 133.0,
+    "protein": 3.0,
+    "fat": 4.0,
+    "satFat": 2.0,
+    "cholesterol": 2.0,
+    "carbs": 22.0,
+    "fibre": 0.0,
+    "sodium": 56.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/whipped-butter",
+   "name": "Whipped Butter",
+   "nutrients": {
+    "kcal": 40.8,
+    "protein": 0.0,
+    "fat": 4.6,
+    "satFat": 3.1,
+    "cholesterol": 11.3,
+    "carbs": 0.0,
+    "fibre": 0.0,
+    "sodium": 39.4
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/wholegrain-chicken-muffin-delight-500-meal",
+   "name": "Chicken Muffin Meal",
+   "nutrients": {
+    "kcal": 482.0,
+    "protein": 22.0,
+    "fat": 21.0,
+    "satFat": 5.9,
+    "cholesterol": 151.0,
+    "carbs": 50.0,
+    "fibre": 5.0,
+    "sodium": 930.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/wholegrain-egg-mcmuffin-delight-500-meal",
+   "name": "Egg McMuffin® Meal",
+   "nutrients": {
+    "kcal": 366.0,
+    "protein": 23.0,
+    "fat": 12.0,
+    "satFat": 5.2,
+    "cholesterol": 335.0,
+    "carbs": 41.0,
+    "fibre": 5.0,
+    "sodium": 670.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/wholegrain-sausage-mcmuffin-delight-500-meal",
+   "name": "Sausage McMuffin® Meal",
+   "nutrients": {
+    "kcal": 355.0,
+    "protein": 21.0,
+    "fat": 12.0,
+    "satFat": 5.2,
+    "cholesterol": 141.0,
+    "carbs": 41.0,
+    "fibre": 5.0,
+    "sodium": 740.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  },
+  {
+   "url": "https://www.mcdonalds.com.sg/food-menu/wholegrain-sausage-mcmuffin-with-egg-delight-500-meal",
+   "name": "Sausage McMuffin® with Egg Meal",
+   "nutrients": {
+    "kcal": 434.0,
+    "protein": 28.0,
+    "fat": 17.0,
+    "satFat": 6.8,
+    "cholesterol": 362.0,
+    "carbs": 42.0,
+    "fibre": 5.0,
+    "sodium": 820.0
+   },
+   "asOf": "Dec 2023",
+   "serving": ""
+  }
+ ]
+}

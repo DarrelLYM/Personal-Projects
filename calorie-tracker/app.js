@@ -66,6 +66,9 @@ const ICON = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
   barcode: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 9v6M10 9v6M13 9v6M16 9v6"/></svg>',
+  repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg>',
   pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
 };
 
@@ -192,7 +195,7 @@ function ensureMonthSubs() {
   if (!state.user) return;
   const start = weekStart(state.selectedDate);
   const end = new Date(start); end.setDate(start.getDate() + 6);
-  const needed = new Set([monthOf(ymd(start)), monthOf(ymd(end)), monthOf(todayKey())]);
+  const needed = new Set([monthOf(ymd(start)), monthOf(ymd(end)), monthOf(todayKey()), monthOf(shiftDay(ymd(state.selectedDate), -1))]);
   for (const [m, unsub] of state.monthSubs) if (!needed.has(m)) { unsub(); state.monthSubs.delete(m); }
   for (const m of needed) {
     if (state.monthSubs.has(m)) continue;
@@ -278,14 +281,19 @@ function renderBars() {
 
 function entryMeta(e) {
   const q = num(e.qty) || 1;
-  return `${q !== 1 ? `${r1(q)} × ` : ""}${esc(e.serving)} · P ${fmt(e.protein * q)}g · C ${fmt(e.carbs * q)}g · F ${fmt(e.fat * q)}g · S ${fmt(e.sugar * q)}g`;
+  const sugar = e.sugar == null ? "" : ` · S ${fmt(num(e.sugar) * q)}g`;
+  const macros = num(e.protein) || num(e.carbs) || num(e.fat) ? ` · P ${fmt(num(e.protein) * q)}g · C ${fmt(num(e.carbs) * q)}g · F ${fmt(num(e.fat) * q)}g` : "";
+  return `${q !== 1 ? `${r1(q)} × ` : ""}${esc(e.serving)}${macros}${macros ? sugar : ""}`;
 }
+
+const shiftDay = (key, n) => { const d = parseYmd(key); d.setDate(d.getDate() + n); return ymd(d); };
+const relDay = (key) => (key === todayKey() ? "today" : key === shiftDay(todayKey(), -1) ? "yesterday" : prettyDate(key));
 
 function renderMeals() {
   const sel = ymd(state.selectedDate);
   const day = dayData(sel);
   const now = sel === todayKey() ? mealForNow() : null;
-  $("#meals").innerHTML = MEALS.map((m) => {
+  let html = MEALS.map((m) => {
     const entries = day[m.id];
     const kcal = totalsOf(entries).kcal;
     const sub = entries.length ? `${fmt(kcal)} kcal · ${entries.length} item${entries.length > 1 ? "s" : ""}` : "Optional · tap + to log";
@@ -296,23 +304,25 @@ function renderMeals() {
       </div>
       ${entries.length ? `<ul class="entries">${entries.map((e) => `
         <li class="entry">
-          <div class="e-main"><div class="e-name">${esc(e.name)}</div><div class="e-meta">${entryMeta(e)}</div></div>
-          <div class="e-kcal">${fmt(e.kcal * (num(e.qty) || 1))}</div>
+          <button class="e-main e-edit" data-edit="${m.id}:${esc(e.id)}" aria-label="Edit ${esc(e.name)}"><div class="e-name">${esc(e.name)}</div><div class="e-meta">${entryMeta(e)}</div></button>
+          <div class="e-kcal">${fmt(num(e.kcal) * (num(e.qty) || 1))}</div>
           <button class="e-del" data-del="${m.id}:${esc(e.id)}" aria-label="Remove ${esc(e.name)}">${ICON.trash}</button>
         </li>`).join("")}</ul>` : ""}
     </div>`;
   }).join("");
+  const empty = MEALS.every((m) => !day[m.id].length);
+  const prevKey = shiftDay(sel, -1);
+  const prev = dayData(prevKey);
+  const prevCount = MEALS.reduce((n, m) => n + prev[m.id].length, 0);
+  if (empty && prevCount) {
+    html += `<button class="secondary copy-day" data-copyday="${prevKey}">Copy all ${prevCount} item${prevCount > 1 ? "s" : ""} from ${esc(relDay(prevKey))}</button>`;
+  }
+  $("#meals").innerHTML = html;
 }
 
 // ---------- Recommendations ----------
-const MAIN_CATS = {
-  breakfast: ["Breakfast", "Bakery", "Dim Sum", "Dairy", "Fast Food", "Hawker"],
-  lunch: ["Hawker", "Zi Char", "Western", "Japanese", "Korean", "Restaurant", "Fast Food", "Dim Sum", "Convenience"],
-  dinner: ["Hawker", "Zi Char", "Western", "Japanese", "Korean", "Restaurant", "Fast Food", "Protein"],
-  supper: ["Hawker", "Dim Sum", "Fast Food", "Snacks", "Dessert", "Kueh", "Convenience", "Fruit", "Dairy"],
-};
-const BREAKFAST_HAWKER = /prata|thosai|porridge|chee cheong|chwee|kaya|you tiao|carrot cake|lor mee|fishball|bee hoon|nasi lemak|mee siam|mee rebus|popiah|soon kueh|png kueh/i;
-const BREAKFAST_FASTFOOD = /muffin|hashbrown|hotcake|egg/i;
+// Only foods with official nutrition data are recommended.
+const BREAKFAST_RE = /prata|thosai|dosa|porridge|congee|chee cheong|chwee|kaya|toast|you tiao|carrot cake|lor mee|fishball|bee hoon|nasi lemak|mee siam|mee rebus|popiah|soon kueh|png kueh|bread|bun|muffin|hotcake|pancake|egg|oat|cereal|idli|appam|putu|kueh|sandwich|breakfast|wrap|bagel|croissant/i;
 
 function planNextMeal() {
   const sel = ymd(state.selectedDate);
@@ -331,35 +341,35 @@ function recommend(plan) {
   const { next, budget, totals, goals: g } = plan;
   const sugarLeft = g.sugar - totals.sugar;
   const proteinLeft = g.protein - totals.protein;
-  const cats = new Set(MAIN_CATS[next]);
   const min = Math.max(150, Math.min(250, budget * 0.45));
   const scored = [];
-  for (const f of allFoods()) {
-    if (!cats.has(f.category)) continue;
-    if (/gravy|sauce|plain white rice|ketupat/i.test(f.name)) continue;
-    if (next === "breakfast" && f.category === "Hawker" && !BREAKFAST_HAWKER.test(f.name)) continue;
-    if (next === "breakfast" && f.category === "Fast Food" && !BREAKFAST_FASTFOOD.test(f.name)) continue;
+  for (const f of foodDb.items) {
+    if (f.tier !== "o") continue;
+    const ok = f.kind === "meal" || (next === "supper" && f.kind === "snack");
+    if (!ok) continue;
+    if (next === "breakfast" && !f.bf) continue;
     if (f.kcal > budget || f.kcal < min) continue;
-    let score = (f.protein * 4 / Math.max(f.kcal, 1)) * (proteinLeft > 0 ? 10 : 4);
+    let score = (num(f.protein) * 4 / Math.max(f.kcal, 1)) * (proteinLeft > 0 ? 10 : 4);
     score += 1 - Math.abs(0.8 - f.kcal / Math.max(budget, 1));
-    if (sugarLeft < 15) score -= f.sugar / 10;
-    score -= f.sodium / 3000;
+    if (sugarLeft < 15 && f.sugar != null) score -= f.sugar / 10;
+    if (f.sodium != null) score -= f.sodium / 3000;
     scored.push([score, f]);
   }
   scored.sort((a, b) => b[0] - a[0]);
-  const perCat = {};
+  const perGroup = {};
   const meals = [];
   for (const [, f] of scored) {
-    perCat[f.category] = (perCat[f.category] || 0) + 1;
-    if (perCat[f.category] > 3) continue;
+    const k = f.brand || f.sub || f.category;
+    perGroup[k] = (perGroup[k] || 0) + 1;
+    if (perGroup[k] > 2) continue;
     meals.push(f);
     if (meals.length >= 8) break;
   }
   const seen = new Set();
-  const drinks = allFoods()
-    .filter((f) => ["Drinks", "Packaged Drinks", "Cafe"].includes(f.category) && f.kcal <= Math.max(20, Math.min(130, plan.remaining)))
+  const drinks = foodDb.items
+    .filter((f) => f.tier === "o" && f.kind === "drink" && f.sugar != null && f.kcal <= Math.max(20, Math.min(130, plan.remaining)))
     .sort((a, b) => (a.sugar - b.sugar) || (a.kcal - b.kcal))
-    .filter((f) => { const k = f.name.split(" (")[0]; if (seen.has(k)) return false; seen.add(k); return true; })
+    .filter((f) => { const k = (f.brand + " " + f.name.split(/[(,]/)[0]).trim(); if (seen.has(k)) return false; seen.add(k); return true; })
     .slice(0, 6);
   return { meals, drinks };
 }
@@ -367,16 +377,17 @@ function recommend(plan) {
 function recCard(f, idx, budget, next) {
   const pct = budget > 0 ? Math.round((f.kcal / budget) * 100) : 0;
   return `<button class="rec" data-rec="${idx}">
-    <span class="r-cat">${esc(f.category)}</span>
+    <span class="r-cat">${esc(f.brand || f.sub || f.category)}</span>
     <span class="r-name">${esc(f.name)}</span>
     <span class="r-kcal">${fmt(f.kcal)} <small>kcal · ${esc(f.serving)}</small></span>
-    <span class="r-macros">P ${fmt(f.protein)}g · C ${fmt(f.carbs)}g · F ${fmt(f.fat)}g · S ${fmt(f.sugar)}g</span>
+    <span class="r-macros">P ${fmt(num(f.protein))}g · C ${fmt(num(f.carbs))}g · F ${fmt(num(f.fat))}g${f.sugar == null ? "" : ` · S ${fmt(f.sugar)}g`}</span>
     ${budget > 0 ? `<span class="r-fit">${pct}% of your ${mealName(next).toLowerCase()} budget</span>` : ""}
   </button>`;
 }
 
 function renderRecs() {
   const el = $("#recs");
+  if (!foodDb.items.length) { el.innerHTML = ""; return; }
   const plan = planNextMeal();
   state.recPlan = plan;
   const { meals, drinks } = recommend(plan);
@@ -389,7 +400,7 @@ function renderRecs() {
     why = `You have <b>${fmt(plan.remaining)} kcal</b> left today, which is less than a meal. A low-sugar drink or a piece of fruit fits.`;
   } else {
     const proteinLeft = Math.max(0, plan.goals.protein - plan.totals.protein);
-    why = `You have <b>${fmt(plan.remaining)} kcal</b> left. For ${meal}, aim for about <b>${fmt(plan.budget)} kcal</b>${proteinLeft > 10 ? ` and some of the <b>${fmt(proteinLeft)}g protein</b> you still need` : ""}. These Singapore picks fit:`;
+    why = `You have <b>${fmt(plan.remaining)} kcal</b> left. For ${meal}, aim for about <b>${fmt(plan.budget)} kcal</b>${proteinLeft > 10 ? ` and some of the <b>${fmt(proteinLeft)}g protein</b> you still need` : ""}. These picks fit, all with official nutrition data:`;
   }
   el.innerHTML = `
     <h3>Picks for ${meal}</h3>
@@ -426,27 +437,75 @@ function renderAll(subs = true) {
 }
 
 // ---------- Logging ----------
+const orNull = (v, round) => (v === null || v === undefined || v === "" ? null : round(num(v)));
+
 function compactFood(f) {
-  const out = { id: f.id || "f" + uid(), name: String(f.name), serving: String(f.serving || "1 serving"), category: String(f.category || ""), source: String(f.source || ""),
-    kcal: r0(num(f.kcal)), protein: r1(num(f.protein)), carbs: r1(num(f.carbs)), fat: r1(num(f.fat)), sugar: r1(num(f.sugar)), sodium: r0(num(f.sodium)) };
+  const out = { id: f.id || "f" + uid(), name: String(f.name), serving: String(f.serving || "1 serving"), category: String(f.category || ""),
+    source: String(f.source || ""), tier: String(f.tier || "u"),
+    kcal: r0(num(f.kcal)), protein: r1(num(f.protein)), carbs: r1(num(f.carbs)), fat: r1(num(f.fat)),
+    sugar: orNull(f.sugar, r1), sodium: orNull(f.sodium, r0) };
+  if (f.brand) out.brand = String(f.brand);
   if (f.barcode) out.barcode = String(f.barcode);
+  if (f.grams) out.grams = r1(num(f.grams));
   return out;
 }
 
-function addEntry(mealId, food, qty) {
-  const dateKey = ymd(state.selectedDate);
+function addEntry(mealId, food, qty, dateKey = ymd(state.selectedDate)) {
   const day = dayData(dateKey);
   const f = compactFood(food);
-  const entry = { ...f, id: uid(), qty: num(qty) || 1, at: new Date().toISOString() };
+  const entry = { ...f, id: uid(), qty: r1(num(qty) * 100) / 100 || 1, at: new Date().toISOString() };
   writeDay(dateKey, { ...day, [mealId]: [...day[mealId], entry] }).catch(() => {});
   const recents = [f, ...(state.profile?.recents || []).filter((r) => !(r.name === f.name && r.serving === f.serving))].slice(0, 25);
   updateProfile({ recents }).catch(() => {});
+}
+
+function addEntries(mealId, entries, dateKey = ymd(state.selectedDate)) {
+  const day = dayData(dateKey);
+  const fresh = entries.map((e) => ({ ...e, id: uid(), at: new Date().toISOString() }));
+  return writeDay(dateKey, { ...day, [mealId]: [...day[mealId], ...fresh] });
 }
 
 function removeEntry(mealId, id) {
   const dateKey = ymd(state.selectedDate);
   const day = dayData(dateKey);
   writeDay(dateKey, { ...day, [mealId]: day[mealId].filter((e) => e.id !== id) }).then(() => toast("Removed")).catch(() => {});
+}
+
+function findEntry(mealId, id) {
+  return dayData(ymd(state.selectedDate))[mealId].find((e) => e.id === id) || null;
+}
+
+function saveEditedEntry(fromMeal, toMeal, id, patch) {
+  const dateKey = ymd(state.selectedDate);
+  const day = dayData(dateKey);
+  const old = day[fromMeal].find((e) => e.id === id);
+  if (!old) return Promise.resolve();
+  const updated = { ...old, ...patch, edited: new Date().toISOString() };
+  const next = { ...day };
+  if (fromMeal === toMeal) next[fromMeal] = day[fromMeal].map((e) => (e.id === id ? updated : e));
+  else { next[fromMeal] = day[fromMeal].filter((e) => e.id !== id); next[toMeal] = [...day[toMeal], updated]; }
+  return writeDay(dateKey, next);
+}
+
+function copyDay(fromKey) {
+  const src = dayData(fromKey);
+  const toKey = ymd(state.selectedDate);
+  const day = dayData(toKey);
+  const next = { ...day };
+  for (const m of MEALS) next[m.id] = [...day[m.id], ...src[m.id].map((e) => ({ ...e, id: uid(), at: new Date().toISOString() }))];
+  return writeDay(toKey, next);
+}
+
+function isFavourite(f) {
+  return (state.profile?.favorites || []).some((x) => x.name === f.name && x.serving === f.serving);
+}
+
+function toggleFavourite(f) {
+  const favs = state.profile?.favorites || [];
+  const on = isFavourite(f);
+  const next = on ? favs.filter((x) => !(x.name === f.name && x.serving === f.serving)) : [compactFood(f), ...favs].slice(0, 100);
+  updateProfile({ favorites: next }).catch(() => {});
+  return !on;
 }
 
 // ---------- Sheet ----------
@@ -488,36 +547,155 @@ function back() {
   show(view, arg, false);
 }
 
+// ---------- Food data ----------
+// data/foods.json: HPB SG FoodID, official chain data and labelled estimates (see scripts/foods).
+// data/packaged.json: packaged foods sold in Singapore from Open Food Facts (refreshed weekly).
+const foodDb = { items: [], info: null, loading: null, packaged: null, packLoading: null, byBarcode: new Map() };
+const TIER_LABEL = { o: "Official", t: "From the product label", e: "Estimate – not official", u: "Your entry" };
+
+function prepFood(f) {
+  f.hay = `${f.name} ${f.brand || ""} ${f.category || ""} ${f.sub || ""} ${f.desc || ""}`.toLowerCase();
+  f.words = f.hay.split(/[^a-z0-9%]+/).filter(Boolean);
+  return f;
+}
+
+function loadFoods() {
+  if (!foodDb.loading) {
+    foodDb.loading = fetch("data/foods.json").then((r) => { if (!r.ok) throw new Error("foods " + r.status); return r.json(); }).then((j) => {
+      foodDb.info = j.info;
+      const S = j.sources;
+      foodDb.items = j.items.map((x) => prepFood({
+        id: x.i, name: x.n, brand: x.b || "", category: x.c, sub: x.g || "", desc: x.d || "", serving: x.s, grams: x.w || 0,
+        kcal: x.k, protein: x.p, carbs: x.cb, fat: x.f, sugar: x.su ?? null, sodium: x.na ?? null,
+        tier: x.t, source: S[x.src].label, srcNote: x.sn || S[x.src].note || "", kind: x.kd || "", bf: !!x.bf, alt: x.alt || null,
+      }));
+    });
+    foodDb.loading.catch(() => { foodDb.loading = null; });
+  }
+  return foodDb.loading;
+}
+
+function loadPackaged() {
+  if (!foodDb.packLoading) {
+    foodDb.packLoading = fetch("data/packaged.json").then((r) => { if (!r.ok) throw new Error("packaged " + r.status); return r.json(); }).then((j) => {
+      foodDb.packagedUpdated = j.updated;
+      foodDb.packaged = j.items.map(([code, name, brand, serving, sg, k, p, c, f, s, na]) => {
+        const g = sg || 100;
+        const x = (v) => (v == null ? null : r1((v * g) / 100));
+        const food = prepFood({
+          id: "off" + code, barcode: code, name, brand, category: "Packaged", serving: sg ? serving : "100 g / ml", grams: g,
+          kcal: r0((k * g) / 100), protein: x(p), carbs: x(c), fat: x(f), sugar: x(s), sodium: na == null ? null : r0((na * g) / 100),
+          tier: "t", source: "Open Food Facts", srcNote: "Product label values, entered by Open Food Facts volunteers",
+        });
+        foodDb.byBarcode.set(code, food);
+        return food;
+      });
+    });
+    foodDb.packLoading.catch(() => { foodDb.packLoading = null; });
+  }
+  return foodDb.packLoading;
+}
+
+const customFoods = () => (state.profile?.customFoods || []).map((f) => prepFood({ ...f, tier: f.tier || "u", category: "My foods" }));
+const allFoods = () => [...customFoods(), ...foodDb.items];
+
 // ---------- Food search ----------
 let activeCategory = "All";
-const allFoods = () => [...(state.profile?.customFoods || []), ...window.SG_FOODS];
+const SYNONYMS = {
+  "cai fan": ["economic rice", "mixed rice"], "cai png": ["economic rice", "mixed rice"], "chap chye png": ["economic rice", "mixed rice"],
+  "economic rice": ["mixed rice"], "kopi": ["coffee"], "teh": ["tea"], "kosong": ["sugar % 0", "no sugar", "unsweetened"],
+  "siew dai": ["less sugar"], "siu dai": ["less sugar"], "peng": ["iced", "cold"], "char siew": ["char siu"], "char siu": ["char siew"],
+  "hor fun": ["kway teow", "flat rice noodles"], "kway teow": ["hor fun"], "prata": ["paratha"], "roti canai": ["prata"],
+  "bubble tea": ["milk tea", "pearl"], "boba": ["pearl", "bubble tea"], "mcd": ["mcdonald"], "macs": ["mcdonald"], "mcdonalds": ["mcdonald"],
+  "ckt": ["char kway teow"], "bcm": ["bak chor mee"], "ytf": ["yong tau foo"], "yong tau hu": ["yong tau foo"], "nuggets": ["mcnuggets"],
+  "fries": ["french fries"], "chips": ["crisps"], "soya": ["soy"], "milo": ["malted"], "porridge": ["congee"], "congee": ["porridge"],
+  "beehoon": ["bee hoon"], "mee hoon": ["bee hoon"], "laksa": ["laksa"],
+};
+
+function queryVariants(q) {
+  const base = q.toLowerCase().replace(/[^a-z0-9%\s]/g, " ").replace(/\s+/g, " ").trim();
+  const out = [base];
+  for (const [key, alts] of Object.entries(SYNONYMS)) {
+    if ((" " + base + " ").includes(" " + key + " ")) for (const a of alts) out.push(base.replace(key, a));
+  }
+  return [...new Set(out)].slice(0, 10);
+}
+
+function editDistance1(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
+function scoreFood(f, tokens, phrase) {
+  const name = f.name.toLowerCase();
+  const base = name.replace(/\s*\(.*?\)\s*/g, " ").trim();
+  let score = 0;
+  if (base === phrase) score += 10;
+  if (name.includes(phrase)) score += 4;
+  if (name.startsWith(tokens[0])) score += 3;
+  if (f.tier === "o") score += 1.5;
+  if (f.tier === "u") score += 2;
+  score -= base.length / 25;
+  return score;
+}
+
+function searchList(list, q, limit = 60) {
+  const variants = queryVariants(q).map((v) => v.split(" ").filter(Boolean)).filter((t) => t.length);
+  if (!variants.length) return [];
+  const hits = new Map();
+  for (const f of list) {
+    for (const tokens of variants) {
+      if (tokens.every((t) => f.hay.includes(t))) {
+        const s = scoreFood(f, tokens, tokens.join(" "));
+        if (!hits.has(f) || hits.get(f) < s) hits.set(f, s);
+      }
+    }
+  }
+  if (hits.size < 3) {
+    // Typo-tolerant pass: each word may be one letter off (for words of 4+ letters).
+    const tokens = variants[0];
+    for (const f of list) {
+      if (hits.has(f)) continue;
+      const fixed = [];
+      const ok = tokens.every((t) => {
+        if (f.hay.includes(t)) { fixed.push(t); return true; }
+        if (t.length < 4) return false;
+        const w = f.words.find((x) => editDistance1(t, x) || (x.length > t.length && editDistance1(t, x.slice(0, t.length))));
+        if (w) fixed.push(w);
+        return !!w;
+      });
+      // Score as if the typo had been typed correctly.
+      if (ok) hits.set(f, scoreFood(f, fixed, fixed.join(" ")) - 1);
+    }
+  }
+  return [...hits.entries()].sort((a, b) => b[1] - a[1]).map((x) => x[0]).slice(0, limit);
+}
+
+function categoryList(cat) {
+  if (cat === "My foods") return customFoods();
+  if (cat === "Favourites") return (state.profile?.favorites || []).map((f) => prepFood({ ...f }));
+  return foodDb.items.filter((f) => f.category === cat);
+}
 
 function searchFoods(q, cat = activeCategory, limit = 60) {
-  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
-  let list = allFoods();
-  if (cat !== "All") list = list.filter((f) => f.category === cat);
-  if (!tokens.length) return cat === "All" ? [] : list.slice(0, limit);
-  const phrase = tokens.join(" ");
-  const scored = [];
-  for (const f of list) {
-    const name = f.name.toLowerCase();
-    const hay = name + " " + String(f.category).toLowerCase();
-    if (!tokens.every((t) => hay.includes(t))) continue;
-    const base = name.replace(/\s*\(.*?\)\s*/g, " ").trim();
-    let score = 0;
-    if (base === phrase) score += 10;
-    if (name.includes(phrase)) score += 4;
-    if (name.startsWith(tokens[0])) score += 3;
-    score -= base.length / 15;
-    scored.push([score, f]);
-  }
-  return scored.sort((a, b) => b[0] - a[0]).map((x) => x[1]).slice(0, limit);
+  const query = q.trim();
+  const list = cat === "All" ? allFoods() : categoryList(cat);
+  if (!query) return cat === "All" ? [] : list.slice(0, 200);
+  return searchList(list, query, limit);
 }
+
+const tierTag = (f) => `<span class="tier tier-${esc(f.tier || "u")}">${esc(f.tier === "e" ? "Estimate" : f.tier === "o" ? "Official" : f.tier === "t" ? "Label" : "Yours")}</span>`;
 
 function resultItem(f, idx) {
   return `<li><button class="result" data-pick="${idx}">
-    <div class="r-main"><div class="r-name">${esc(f.name)}</div>
-    <div class="r-meta">${esc(f.serving)} · P ${fmt(f.protein)}g · C ${fmt(f.carbs)}g · F ${fmt(f.fat)}g · S ${fmt(f.sugar)}g</div></div>
+    <div class="r-main"><div class="r-name">${esc(f.name)}${f.brand && !f.name.toLowerCase().includes(f.brand.toLowerCase()) ? ` <span class="r-brand">${esc(f.brand)}</span>` : ""}</div>
+    <div class="r-meta">${tierTag(f)} ${esc(f.serving)} · P ${fmt(num(f.protein))}g · C ${fmt(num(f.carbs))}g · F ${fmt(num(f.fat))}g${f.sugar == null ? "" : ` · S ${fmt(f.sugar)}g`}</div></div>
     <div class="r-kcal">${fmt(f.kcal)} kcal</div></button></li>`;
 }
 
@@ -526,34 +704,59 @@ function renderResults(q) {
   const wrap = $("#resultsWrap");
   if (!wrap) return;
   const query = q.trim();
-  let html;
-  if (!query && activeCategory === "All") {
-    pickList = (state.profile?.recents || []).slice(0, 12);
-    html = pickList.length
-      ? `<div class="section-label">Recent</div><ul class="results">${pickList.map(resultItem).join("")}</ul>`
-      : `<p class="muted">Search ${window.SG_FOODS.length} Singapore foods: hawker dishes, kopitiam drinks, fast food, bubble tea and supermarket brands.</p>`;
-  } else {
-    pickList = searchFoods(query);
-    html = pickList.length ? `<ul class="results">${pickList.map(resultItem).join("")}</ul>` : `<p class="muted">No match in the food list.</p>`;
-    if (query.length >= 2) html += `<button class="link-btn" id="onlineBtn">Search packaged products online for “${esc(query)}”</button><div id="online"></div>`;
-    html += `<button class="link-btn" data-act="custom-q">Can't find it? Enter it manually</button>`;
+  let html = "";
+  if (!foodDb.items.length) {
+    wrap.innerHTML = '<div class="spinner"></div><p class="muted">Loading the food list…</p>';
+    loadFoods().then(() => { if ($("#resultsWrap")) renderResults($("#q")?.value || ""); }).catch(() => {
+      if ($("#resultsWrap")) $("#resultsWrap").innerHTML = '<p class="muted">Couldn\'t load the food list. Check your connection.</p>';
+    });
+    return;
   }
+  if (!query && activeCategory === "All") {
+    const favs = (state.profile?.favorites || []).slice(0, 8).map((f) => prepFood({ ...f }));
+    const recents = (state.profile?.recents || []).filter((r) => !favs.some((f) => f.name === r.name && f.serving === r.serving)).slice(0, 10).map((f) => prepFood({ ...f }));
+    pickList = [...favs, ...recents];
+    if (favs.length) html += `<div class="section-label">Favourites</div><ul class="results">${favs.map((f, i) => resultItem(f, i)).join("")}</ul>`;
+    if (recents.length) html += `<div class="section-label">Recent</div><ul class="results">${recents.map((f, i) => resultItem(f, favs.length + i)).join("")}</ul>`;
+    if (!pickList.length) html = `<p class="muted">Search ${foodDb.items.length.toLocaleString("en-SG")} foods with official data (hawker dishes, drinks, McDonald's, Ya Kun and more), plus thousands of packaged products.</p>`;
+    wrap.innerHTML = html;
+    return;
+  }
+  pickList = searchFoods(query);
+  html = pickList.length ? `<ul class="results">${pickList.map(resultItem).join("")}</ul>` : `<p class="muted">No match in the main food list.</p>`;
+  if (query.length >= 2 && activeCategory === "All") {
+    html += `<div id="packWrap"></div>`;
+    html += `<button class="link-btn" id="onlineBtn">Search more packaged products online</button><div id="online"></div>`;
+  }
+  html += `<button class="link-btn" data-act="custom-q">Can't find it? Enter it manually</button>`;
   wrap.innerHTML = html;
   $("#onlineBtn")?.addEventListener("click", () => searchOnline(query));
+  if (query.length >= 2 && activeCategory === "All") {
+    const fill = () => {
+      const box = $("#packWrap");
+      if (!box || ($("#q")?.value || "").trim() !== query) return;
+      const hits = searchList(foodDb.packaged || [], query, 25);
+      if (!hits.length) return;
+      const offset = pickList.length;
+      pickList = pickList.concat(hits);
+      box.innerHTML = `<div class="section-label">Packaged products</div><ul class="results">${hits.map((f, i) => resultItem(f, offset + i)).join("")}</ul>`;
+    };
+    if (foodDb.packaged) fill(); else loadPackaged().then(fill).catch(() => {});
+  }
 }
 
-// ---------- Open Food Facts (free packaged-product database) ----------
+// ---------- Open Food Facts (online fallback for packaged products) ----------
 function offToFood(p, code) {
   const n = p.nutriments || {};
   const hasServing = n["energy-kcal_serving"] != null && p.serving_size;
-  const pick = (k) => num(hasServing ? n[k + "_serving"] : n[k + "_100g"]);
+  const pick = (k) => { const v = hasServing ? n[k + "_serving"] : n[k + "_100g"]; return v == null || v === "" ? null : num(v); };
   let kcal = pick("energy-kcal");
   if (!kcal) { const kj = pick("energy"); if (kj) kcal = kj / 4.184; }
-  const brand = p.brands ? ` (${p.brands.split(",")[0].trim()})` : "";
+  const sodium = pick("sodium");
   return compactFood({
-    id: "off" + (p.code || code || uid()), name: (p.product_name || p.product_name_en || "Unnamed product") + brand,
-    serving: hasServing ? p.serving_size : "100g / 100ml", kcal, protein: pick("proteins"), carbs: pick("carbohydrates"),
-    fat: pick("fat"), sugar: pick("sugars"), sodium: pick("sodium") * 1000, category: "Packaged", source: "Open Food Facts",
+    id: "off" + (p.code || code || uid()), name: p.product_name || p.product_name_en || "Unnamed product", brand: p.brands ? p.brands.split(",")[0].trim() : "",
+    serving: hasServing ? p.serving_size : "100 g / ml", kcal, protein: pick("proteins"), carbs: pick("carbohydrates"),
+    fat: pick("fat"), sugar: pick("sugars"), sodium: sodium == null ? null : sodium * 1000, category: "Packaged", source: "Open Food Facts", tier: "t",
     barcode: p.code || code,
   });
 }
@@ -659,8 +862,11 @@ async function handleCode(code) {
   code = String(code).replace(/\D/g, "");
   if (code.length < 6) { toast("That doesn't look like a barcode number"); return; }
   const mine = (state.profile?.customFoods || []).find((f) => f.barcode === code);
-  if (mine) { show("detail", mine); return; }
+  if (mine) { show("detail", { ...mine, tier: mine.tier || "u" }); return; }
   const body = $("#sheetBody");
+  try { await loadPackaged(); } catch { /* fall back to the online lookup */ }
+  const local = foodDb.byBarcode.get(code);
+  if (local) { show("detail", local); return; }
   body.innerHTML = `<div class="spinner"></div><p class="scan-status">Barcode ${esc(code)} found. Looking it up…</p>`;
   try {
     const food = await lookupBarcode(code);
@@ -748,21 +954,32 @@ const VIEWS = {
   add(body) {
     $("#sheetTitle").textContent = "Log a meal";
     renderMealTabs(true);
-    const cats = ["All", ...new Set(window.SG_FOODS.map((f) => f.category))];
-    if ((state.profile?.customFoods || []).length) cats.splice(1, 0, "My foods");
+    const order = foodDb.info?.categories || [...new Set(foodDb.items.map((f) => f.category))];
+    const cats = ["All"];
+    if ((state.profile?.favorites || []).length) cats.push("Favourites");
+    if ((state.profile?.customFoods || []).length) cats.push("My foods");
+    cats.push(...order);
     if (!cats.includes(activeCategory)) activeCategory = "All";
+    const prevKey = shiftDay(ymd(state.selectedDate), -1);
+    const prevMeal = dayData(prevKey)[sheet.meal];
+    const repeat = prevMeal.length
+      ? `<button class="repeat" data-act="repeat" data-from="${prevKey}">${ICON.repeat}<span><b>Same as ${esc(relDay(prevKey) === "today" || relDay(prevKey) === "yesterday" ? relDay(prevKey) + "'s" : prettyDate(prevKey))} ${esc(mealName(sheet.meal).toLowerCase())}</b><small>${prevMeal.length} item${prevMeal.length > 1 ? "s" : ""} · ${fmt(totalsOf(prevMeal).kcal)} kcal · ${esc(prevMeal.map((e) => e.name).join(", ").slice(0, 70))}</small></span></button>`
+      : "";
     body.innerHTML = `
-      <div class="modes">
-        <button class="mode" data-act="scan">${ICON.barcode}<b>Scan barcode</b><span>Packaged food and drinks</span></button>
-        <button class="mode" data-act="custom">${ICON.pen}<b>Manual entry</b><span>Type in calories and macros</span></button>
+      <div class="modes modes-3">
+        <button class="mode" data-act="scan">${ICON.barcode}<b>Scan</b><span>Barcode</span></button>
+        <button class="mode" data-act="quick">${ICON.bolt}<b>Quick add</b><span>Just calories</span></button>
+        <button class="mode" data-act="custom">${ICON.pen}<b>Manual</b><span>Full details</span></button>
       </div>
-      <div class="search">${ICON.search}<input id="q" type="search" placeholder="Search SG food, drinks, brands" autocomplete="off" enterkeyhint="search" aria-label="Search foods"></div>
+      ${repeat}
+      <div class="search">${ICON.search}<input id="q" type="search" placeholder="Search food, drinks, brands" autocomplete="off" enterkeyhint="search" aria-label="Search foods"></div>
       <div class="chips" id="chips">${cats.map((c) => `<button data-cat="${esc(c)}" class="${c === activeCategory ? "on" : ""}">${esc(c)}</button>`).join("")}</div>
       <div id="resultsWrap"></div>`;
     const input = $("#q", body);
+    let t;
     const update = () => renderResults(input.value);
-    input.addEventListener("input", update);
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); });
+    input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(update, 120); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { input.blur(); update(); } });
     $("#chips", body).addEventListener("click", (e) => {
       const b = e.target.closest("[data-cat]");
       if (!b) return;
@@ -771,6 +988,30 @@ const VIEWS = {
       update();
     });
     update();
+  },
+
+  quick(body) {
+    $("#sheetTitle").textContent = "Quick add";
+    renderMealTabs(true);
+    body.innerHTML = `
+      <div class="form">
+        <div class="field full"><label for="qaKcal">Calories (kcal)</label><input id="qaKcal" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 450"></div>
+        <div class="field full"><label for="qaName">What was it? (optional)</label><input id="qaName" type="text" autocomplete="off" placeholder="e.g. Office snacks"></div>
+        <div class="field"><label for="qaP">Protein g (optional)</label><input id="qaP" type="number" inputmode="decimal" min="0" step="any"></div>
+        <div class="field"><label for="qaC">Carbs g (optional)</label><input id="qaC" type="number" inputmode="decimal" min="0" step="any"></div>
+        <div class="field"><label for="qaF">Fat g (optional)</label><input id="qaF" type="number" inputmode="decimal" min="0" step="any"></div>
+        <div class="field"><label for="qaS">Sugar g (optional)</label><input id="qaS" type="number" inputmode="decimal" min="0" step="any"></div>
+      </div>
+      <button class="primary" id="qaAdd">Add to ${mealName(sheet.meal)}</button>`;
+    setTimeout(() => $("#qaKcal")?.focus(), 250);
+    $("#qaAdd", body).addEventListener("click", () => {
+      const v = (id) => $("#" + id, body).value.trim();
+      if (v("qaKcal") === "" || num(v("qaKcal")) <= 0) return toast("Enter the calories");
+      addEntry(sheet.meal, { name: v("qaName") || "Quick add", serving: "1 serving", category: "Quick add", source: "Your entry", tier: "u",
+        kcal: v("qaKcal"), protein: v("qaP"), carbs: v("qaC"), fat: v("qaF"), sugar: v("qaS") === "" ? null : v("qaS"), sodium: null }, 1);
+      closeSheet();
+      toast(`Added to ${mealName(sheet.meal)}`);
+    });
   },
 
   scan(body) {
@@ -814,12 +1055,23 @@ const VIEWS = {
   detail(body, food) {
     $("#sheetTitle").textContent = "Add to " + mealName(sheet.meal);
     renderMealTabs(true);
+    const portions = [{ label: food.serving, q: 1 }];
+    if (food.grams && Array.isArray(food.alt)) for (const [label, g] of food.alt) if (g > 0) portions.push({ label, q: g / food.grams });
+    portions.push({ label: "Small (¾ portion)", q: 0.75 }, { label: "Large (1½ portions)", q: 1.5 });
+    if (food.grams) portions.push({ label: "Custom amount in grams / ml", q: "custom" });
+    const fav = isFavourite(food);
+    const tier = food.tier || "u";
     body.innerHTML = `
       <div class="detail-card">
-        <h4>${esc(food.name)}</h4>
-        <div class="src">${esc(food.serving)} · ${esc(food.source || food.category || "")}</div>
+        <div class="d-head"><h4>${esc(food.name)}</h4>
+          <button class="star${fav ? " on" : ""}" id="favBtn" aria-pressed="${fav}" aria-label="${fav ? "Remove from" : "Add to"} favourites">${ICON.star}</button></div>
+        ${food.brand && !food.name.toLowerCase().includes(food.brand.toLowerCase()) ? `<div class="src">${esc(food.brand)}</div>` : ""}
+        <div class="srcline"><span class="tier tier-${esc(tier)}">${esc(TIER_LABEL[tier] || "")}</span> <span>${esc(food.source || "")}${food.srcNote ? " · " + esc(food.srcNote) : ""}</span></div>
         <div class="big-kcal"><span id="dk">${fmt(food.kcal)}</span> <small>kcal</small></div>
         <div class="macro-row" id="dm"></div>
+        <div class="field" style="margin-top:14px"><label for="portion">Portion</label>
+          <select id="portion" class="sel">${portions.map((p, i) => `<option value="${i}">${esc(p.label)}</option>`).join("")}</select></div>
+        <div class="field" id="gramsWrap" hidden style="margin-top:10px"><label for="grams">Amount (g / ml)</label><input id="grams" type="number" inputmode="decimal" min="1" step="any" value="${esc(food.grams || "")}"></div>
         <div class="qty">
           <span class="q-label">Servings</span>
           <div class="stepper">
@@ -830,24 +1082,109 @@ const VIEWS = {
         </div>
         <button class="primary" id="addBtn">Add to ${mealName(sheet.meal)}</button>
       </div>
-      ${food.source === "Open Food Facts" ? '<p class="note">From Open Food Facts, a free database run by volunteers. If the numbers look wrong, check the label and enter it manually instead.</p>' : ""}`;
-    const qty = $("#qty", body);
+      ${tier === "e" ? `<p class="note">There's no official nutrition data for this item, so these numbers are an estimate. You can change them after logging by tapping the entry.</p>` : ""}
+      ${tier === "t" ? `<p class="note">From the product's nutrition label, entered by Open Food Facts volunteers. If anything looks off, check the pack and edit the entry after logging.</p>` : ""}
+      ${food.sugar == null && tier !== "u" ? `<p class="note">Sugar isn't published by this source, so it isn't counted in your sugar total.</p>` : ""}
+      <button class="link-btn" data-act="about-data">About the food data</button>`;
+    const qty = $("#qty", body), sel = $("#portion", body), gramsIn = $("#grams", body);
+    const mult = () => {
+      const p = portions[+sel.value];
+      const pq = p.q === "custom" ? num(gramsIn.value) / (food.grams || 1) : p.q;
+      return pq * num(qty.value);
+    };
     const paint = () => {
-      const q = num(qty.value);
-      $("#dk", body).textContent = fmt(food.kcal * q);
+      $("#gramsWrap", body).hidden = portions[+sel.value].q !== "custom";
+      const m = mult();
+      $("#dk", body).textContent = fmt(food.kcal * m);
       $("#dm", body).innerHTML = [["Protein", food.protein, "g"], ["Carbs", food.carbs, "g"], ["Fat", food.fat, "g"], ["Sugar", food.sugar, "g"], ["Sodium", food.sodium, "mg"]]
-        .map(([k, v, u]) => `<div><div class="k">${k}</div><div class="v">${fmt(num(v) * q)}${u === "g" ? "g" : ""}</div></div>`).join("");
+        .map(([k, v, u]) => `<div><div class="k">${k}</div><div class="v">${v == null ? "–" : fmt(num(v) * m) + (u === "g" ? "g" : "")}</div></div>`).join("");
     };
     body.querySelectorAll("[data-step]").forEach((b) => b.addEventListener("click", () => { qty.value = Math.max(0.5, r1(num(qty.value) + num(b.dataset.step))); paint(); }));
     qty.addEventListener("input", paint);
+    sel.addEventListener("change", paint);
+    gramsIn.addEventListener("input", paint);
+    $("#favBtn", body).addEventListener("click", (e) => {
+      const on = toggleFavourite(food);
+      e.currentTarget.classList.toggle("on", on);
+      e.currentTarget.setAttribute("aria-pressed", on);
+      toast(on ? "Added to favourites" : "Removed from favourites");
+    });
     $("#addBtn", body).addEventListener("click", () => {
-      const q = num(qty.value);
-      if (q <= 0) return toast("Enter how many servings");
-      addEntry(sheet.meal, food, q);
+      const m = mult();
+      if (!(m > 0)) return toast("Enter how much you had");
+      addEntry(sheet.meal, food, m);
       closeSheet();
       toast(`Added to ${mealName(sheet.meal)}`);
     });
     paint();
+  },
+
+  editEntry(body, ref) {
+    const [mealId, id] = ref.split(":");
+    const e = findEntry(mealId, id);
+    if (!e) { closeSheet(); return; }
+    $("#sheetTitle").textContent = "Edit entry";
+    renderMealTabs(true);
+    const f = (fid, label, val, cls = "", text = false) => `<div class="field ${cls}"><label for="${fid}">${label}</label><input id="${fid}" ${text ? 'type="text"' : 'type="number" inputmode="decimal" min="0" step="any"'} value="${esc(val ?? "")}"></div>`;
+    body.innerHTML = `
+      <p class="note" style="margin-top:0">Tap a meal above to move this entry. Values are for one serving.</p>
+      <div class="form">
+        ${f("eName", "Name", e.name, "full", true)}
+        ${f("eServing", "Serving", e.serving, "full", true)}
+        ${f("eQty", "Servings", e.qty || 1)}
+        ${f("eKcal", "Calories (kcal)", e.kcal)}
+        ${f("eP", "Protein (g)", e.protein)}
+        ${f("eC", "Carbs (g)", e.carbs)}
+        ${f("eF", "Fat (g)", e.fat)}
+        ${f("eS", "Sugar (g)", e.sugar)}
+        ${f("eNa", "Sodium (mg)", e.sodium)}
+      </div>
+      <p class="note">${esc(TIER_LABEL[e.tier] || "")}${e.source ? " · " + esc(e.source) : ""}. Changing the numbers marks this entry as edited by you.</p>
+      <button class="primary" id="eSave">Save changes</button>
+      <button class="secondary danger" id="eDel">Remove entry</button>`;
+    const vals = () => {
+      const v = (fid) => $("#" + fid, body).value.trim();
+      return { name: v("eName") || e.name, serving: v("eServing") || e.serving, qty: num(v("eQty")) || 1, kcal: r0(num(v("eKcal"))),
+        protein: r1(num(v("eP"))), carbs: r1(num(v("eC"))), fat: r1(num(v("eF"))),
+        sugar: v("eS") === "" ? null : r1(num(v("eS"))), sodium: v("eNa") === "" ? null : r0(num(v("eNa"))) };
+    };
+    $("#eSave", body).addEventListener("click", () => {
+      const nv = vals();
+      const changed = ["kcal", "protein", "carbs", "fat", "sugar", "sodium"].some((k) => (nv[k] ?? null) !== (e[k] ?? null));
+      if (changed) nv.tier = "u";
+      saveEditedEntry(mealId, sheet.meal, id, nv).then(() => toast("Saved")).catch(() => {});
+      closeSheet();
+    });
+    $("#eDel", body).addEventListener("click", () => { removeEntry(mealId, id); closeSheet(); });
+  },
+
+  aboutData(body) {
+    $("#sheetTitle").textContent = "About the food data";
+    renderMealTabs(false);
+    const info = foodDb.info || {};
+    const counts = info.counts || {};
+    body.innerHTML = `
+      <div class="about">
+        <p>Every food shows where its numbers come from:</p>
+        <ul class="tiers">
+          <li><span class="tier tier-o">Official</span> Published by the Health Promotion Board or by the brand itself.</li>
+          <li><span class="tier tier-t">Label</span> Copied from the product's nutrition label by Open Food Facts volunteers.</li>
+          <li><span class="tier tier-e">Estimate</span> No official data exists. Typical values; check and edit if you can.</li>
+          <li><span class="tier tier-u">Yours</span> Entered or edited by you.</li>
+        </ul>
+        <h4>Sources</h4>
+        <p><b>Singapore Food Insights Database (SG FoodID), Health Promotion Board</b>${counts.hpb ? ` · ${counts.hpb.toLocaleString("en-SG")} foods` : ""}<br>
+        Contains information from Singapore Food Insights Database (SG FoodID) accessed on ${esc(info.hpbAccessed || "")} from Health Promotion Board which is made available under the terms found at
+        <a href="https://pphtpc.hpb.gov.sg/web/sgfoodid" target="_blank" rel="noopener">pphtpc.hpb.gov.sg/web/sgfoodid</a>
+        (<a href="https://file.go.gov.sg/termsofuse-hpbsgfoodid.pdf" target="_blank" rel="noopener">licence</a>).
+        The information contained within this dataset is provided on an "as-is" basis. The data, including but not limited to nutritional information, is subject to inherent limitations. No warranty or representation is made as to the accuracy or completeness of the data contained herein.
+        This app is not endorsed by the Health Promotion Board.</p>
+        <p><b>McDonald's Singapore</b>${counts.mcd ? ` · ${counts.mcd} items` : ""}: nutrition facts published on <a href="https://www.mcdonalds.com.sg/nutrition-calculator" target="_blank" rel="noopener">mcdonalds.com.sg</a> (current as of ${esc(info.mcdAsOf || "Dec 2023")}). McDonald's doesn't publish sugar.</p>
+        <p><b>Ya Kun Kaya Toast</b>${counts.yakun ? ` · ${counts.yakun} drinks` : ""}: official Nutrition Information Panel on <a href="https://app.yakun.com/nutritional-information" target="_blank" rel="noopener">yakun.com</a>, per 100ml, converted to each cup size.</p>
+        <p><b>Open Food Facts</b>${foodDb.packaged ? ` · ${foodDb.packaged.length.toLocaleString("en-SG")} packaged products` : ""}: data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">openfoodfacts.org</a>, available under the <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">Open Database License</a>. Refreshed weekly.</p>
+        ${counts.est ? `<p><b>Estimates</b> · ${counts.est} items from chains that don't publish nutrition data (e.g. KFC, Jollibee, bubble tea shops). Shown with an Estimate tag.</p>` : ""}
+        <p class="note">Nutrition varies with portion size, recipe and preparation. Use these numbers as a guide, not medical advice.</p>
+      </div>`;
   },
 
   custom(body, prefill = {}) {
@@ -873,7 +1210,7 @@ const VIEWS = {
       const name = v("cName");
       if (!name) return toast("Give the food a name");
       if (v("cKcal") === "") return toast("Enter the calories");
-      const food = compactFood({ name, serving: v("cServing") || "1 serving", category: "My foods", source: "My foods", barcode: prefill.barcode,
+      const food = compactFood({ name, serving: v("cServing") || "1 serving", category: "My foods", source: "My foods", tier: "u", barcode: prefill.barcode,
         kcal: v("cKcal"), protein: v("cProtein"), carbs: v("cCarbs"), fat: v("cFat"), sugar: v("cSugar"), sodium: v("cSodium") });
       if ($("#cSave", body).checked) {
         const customFoods = [food, ...(state.profile?.customFoods || []).filter((c) => c.name.toLowerCase() !== name.toLowerCase() && (!food.barcode || c.barcode !== food.barcode))].slice(0, 300);
@@ -942,11 +1279,11 @@ const VIEWS = {
       <button class="secondary" data-act="restore">Restore from a backup</button>
       <div class="section-label">Password</div>
       <button class="secondary" style="margin-top:0" id="resetPw">Email me a link to change my password</button>
-      <div class="section-label">This day</div>
-      <button class="secondary danger" style="margin-top:0" id="clearDay">Clear everything logged on ${state.selectedDate.toLocaleDateString("en-SG", { day: "numeric", month: "short" })}</button>
+      <div class="section-label">Food data</div>
+      <button class="secondary" style="margin-top:0" data-act="about-data">Where the nutrition numbers come from</button>
       <button class="secondary" id="signOutBtn" style="margin-top:22px">Sign out</button>
       <button class="secondary danger" data-act="delete-account">Delete my account</button>
-      <p class="note">${window.SG_FOODS.length} Singapore foods built in. Values are typical portions from HPB and brand data; hawker portions vary by stall.</p>`;
+      <p class="note">Nutrition data from HPB SG FoodID, McDonald's Singapore, Ya Kun and Open Food Facts. Tap "Where the nutrition numbers come from" for details and credits.</p>`;
     $("#autoGoals", body).addEventListener("click", () => {
       const a = goalsFor(num($("#gKcal", body).value) || 1800);
       $("#gProtein", body).value = a.protein; $("#gCarbs", body).value = a.carbs; $("#gFat", body).value = a.fat;
@@ -961,10 +1298,6 @@ const VIEWS = {
     $("#resetPw", body).addEventListener("click", async (e) => {
       e.target.disabled = true;
       try { await sendReset(state.user.email); toast(`Link sent to ${state.user.email}`); } catch { toast("Couldn't send the email. Try again later."); e.target.disabled = false; }
-    });
-    armButton($("#clearDay", body), "Tap again to clear this day", async () => {
-      await writeDay(ymd(state.selectedDate), Object.fromEntries(MEALS.map((m) => [m.id, []]))).catch(() => {});
-      closeSheet(); toast("Day cleared");
     });
     $("#signOutBtn", body).addEventListener("click", async () => { closeSheet(); await fb.signOut(fb.auth); });
   },
@@ -1288,7 +1621,11 @@ function bindEvents() {
     const add = e.target.closest("[data-add]");
     if (add) return openSheet(add.dataset.add, "add");
     const del = e.target.closest("[data-del]");
-    if (del) { const [m, id] = del.dataset.del.split(":"); removeEntry(m, id); }
+    if (del) { const [m, id] = del.dataset.del.split(":"); removeEntry(m, id); return; }
+    const edit = e.target.closest("[data-edit]");
+    if (edit) { openSheet(edit.dataset.edit.split(":")[0], "editEntry", edit.dataset.edit); return; }
+    const cp = e.target.closest("[data-copyday]");
+    if (cp) { cp.disabled = true; copyDay(cp.dataset.copyday).then(() => toast("Copied")).catch(() => {}); }
   });
   $("#recs").addEventListener("click", (e) => {
     const r = e.target.closest("[data-rec]");
@@ -1321,7 +1658,12 @@ function bindEvents() {
     sheet.meal = b.dataset.meal;
     $("#mealTabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
     const top = sheet.stack[sheet.stack.length - 1];
-    if (top && top[0] !== "scan") show(top[0], top[1], false);
+    // Only the "Log a meal" list depends on the meal; elsewhere keep what's been typed and just relabel.
+    if (top && top[0] === "add") show("add", null, false);
+    else {
+      document.querySelectorAll("#addBtn, #qaAdd, #cAdd").forEach((x) => { x.textContent = `Add to ${mealName(sheet.meal)}`; });
+      if (top && top[0] === "detail") $("#sheetTitle").textContent = "Add to " + mealName(sheet.meal);
+    }
   });
 
   $("#sheetBody").addEventListener("click", (e) => {
@@ -1335,6 +1677,13 @@ function bindEvents() {
     else if (act === "custom") show("custom", {});
     else if (act === "custom-q") show("custom", { name: $("#q")?.value || "" });
     else if (act === "custom-barcode") show("custom", { barcode: actEl.dataset.code });
+    else if (act === "quick") show("quick");
+    else if (act === "about-data") show("aboutData");
+    else if (act === "repeat") {
+      const items = dayData(actEl.dataset.from)[sheet.meal];
+      addEntries(sheet.meal, items).then(() => toast(`Added ${items.length} item${items.length > 1 ? "s" : ""} to ${mealName(sheet.meal)}`)).catch(() => {});
+      closeSheet();
+    }
     else if (act === "edit-username") show("editUsername");
     else if (act === "edit-email") show("editEmail");
     else if (act === "notifications") show("notifications");
@@ -1352,6 +1701,7 @@ function showSetupNeeded() {
 
 async function boot() {
   bindEvents();
+  loadFoods().then(() => renderAll(false)).catch((e) => console.warn("food list", e));
   if (!firebaseConfig?.apiKey || /PASTE/i.test(firebaseConfig.apiKey)) { showSetupNeeded(); return; }
   try { await loadFirebase(); }
   catch (e) {
@@ -1558,7 +1908,8 @@ async function exportCsv() {
       const d = m.days[date] || {};
       for (const meal of MEALS) for (const e of d[meal.id] || []) {
         const q = num(e.qty) || 1;
-        rows.push([date, meal.name, e.name, e.serving, r1(q), r0(e.kcal * q), r1(e.protein * q), r1(e.carbs * q), r1(e.fat * q), r1(e.sugar * q), r0(e.sodium * q), e.source]);
+        const opt = (v, f) => (v == null ? "" : f(num(v) * q));
+        rows.push([date, meal.name, e.name, e.serving, r1(q), r0(num(e.kcal) * q), r1(num(e.protein) * q), r1(num(e.carbs) * q), r1(num(e.fat) * q), opt(e.sugar, r1), opt(e.sodium, r0), e.source]);
       }
     }
   }

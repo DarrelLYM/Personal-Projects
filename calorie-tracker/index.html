@@ -171,6 +171,35 @@
   .mode svg { width: 28px; height: 28px; color: var(--purple); }
   .mode b { font-size: 15px; }
   .mode span { font-size: 12px; color: var(--ink-3); }
+  .modes-3 { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .modes-3 .mode { padding: 14px 10px; align-items: flex-start; }
+  .modes-3 .mode svg { width: 24px; height: 24px; }
+  .repeat { width: 100%; display: flex; gap: 12px; align-items: center; text-align: left; background: var(--card); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .repeat svg { width: 22px; height: 22px; color: var(--purple); flex: none; }
+  .repeat span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .repeat b { font-size: 14px; }
+  .repeat small { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tier { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .3px; padding: 1px 7px; border-radius: 99px; vertical-align: 1px; white-space: nowrap; }
+  .tier-o { background: rgba(18,161,80,.14); color: #0e8a45; }
+  .tier-t { background: rgba(59,130,246,.14); color: #2563eb; }
+  .tier-e { background: rgba(245,158,11,.18); color: #b45309; }
+  .tier-u { background: var(--soft); color: var(--purple); }
+  @media (prefers-color-scheme: dark) { .tier-o { color: #4ade80; } .tier-t { color: #93c5fd; } .tier-e { color: #fbbf24; } }
+  .r-brand { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+  .srcline { font-size: 12px; color: var(--ink-3); margin-top: 8px; line-height: 1.5; }
+  .d-head { display: flex; align-items: flex-start; gap: 10px; }
+  .d-head h4 { flex: 1; min-width: 0; }
+  .star { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-3); background: var(--bg); flex: none; }
+  .star svg { width: 20px; height: 20px; fill: none; }
+  .star.on { color: #f59e0b; }
+  .star.on svg { fill: currentColor; }
+  .e-edit { text-align: left; padding: 0; background: none; }
+  .copy-day { margin-top: 14px; }
+  .about { font-size: 14px; line-height: 1.6; color: var(--ink-2); }
+  .about p { margin: 0 0 12px; }
+  .about h4 { margin: 16px 0 8px; color: var(--ink); }
+  .about a { color: var(--purple); }
+  .tiers { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 8px; }
   .search { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 16px; padding: 0 14px; box-shadow: var(--shadow); }
   .search svg { width: 20px; height: 20px; color: var(--ink-3); flex: none; }
   .search input { flex: 1; border: 0; outline: 0; background: transparent; padding: 14px 0; font-size: 16px; min-width: 0; }
@@ -341,7 +370,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="firebase-config.js"></script>
-<script src="foods.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>

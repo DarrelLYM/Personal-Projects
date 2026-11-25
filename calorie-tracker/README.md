@@ -12,7 +12,9 @@ A free calorie tracker for food eaten in Singapore. It runs in any phone browser
 - Progress bars for Calories, Protein, Carbs, Fat and Sugar; week date strip; jump to any date in the last 10 years
 - 4 optional meals: Breakfast, Lunch, Dinner, Supper
 - **Scan:** live barcode scanning on the phone. The camera image is never saved or uploaded; only the barcode number is looked up. Unknown products can be entered once and are recognised on the next scan.
-- **Manual:** search 380 Singapore foods, search packaged products online, or type in your own values
+- **Food search:** about 3,000 foods with official data (HPB's SG FoodID for hawker and everyday food, McDonald's Singapore, Ya Kun drinks), packaged products from Open Food Facts, and labelled estimates for chains that publish nothing. Understands local names ("cai fan", "kopi siew dai", "CKT") and small typos.
+- **Faster logging:** quick add (just calories), portion sizes (small / regular / large / grams), favourites, recent foods, "same as yesterday's lunch", and copying a whole day
+- **Edit entries:** tap any logged food to change its numbers, servings or meal
 - **Picks:** local dishes and low-sugar drinks that fit the calories left today
 - **History:** search past foods (e.g. "bubble tea") over 7 days, 30 days, this month, this year or all time, or see daily totals and the most-eaten foods
 - **Profile:** edit daily goals; change username (instant) or email (confirmed by a link sent to the new address); reset password; sign out
@@ -56,6 +58,20 @@ Authentication > **Sign-in method** > click **Email/Password** > switch on **Ema
 - Each kind of reminder is sent at most once per time slot. Meal and end-of-day reminders are skipped if food was already logged.
 - **Limits:** GitHub can start the hourly job late when it's busy, so reminders may arrive up to about an hour after the chosen time. iPhones need iOS 16.4+ and the app added to the Home Screen from Safari. GitHub pauses scheduled jobs after 60 days without repo activity; the job re-enables itself each run, but if reminders ever stop, check the **Actions** tab and click **Enable workflow**.
 
+## Where the nutrition numbers come from
+Every food carries a tag shown in the app:
+
+| Tag | Source | Refreshed |
+|---|---|---|
+| **Official** | HPB [SG FoodID](https://pphtpc.hpb.gov.sg/web/sgfoodid) (lab-analysed and label data for local food), [McDonald's Singapore](https://www.mcdonalds.com.sg/nutrition-calculator), [Ya Kun](https://app.yakun.com/nutritional-information) drinks | By running `scripts/foods/build.py` after updating the snapshots in `scripts/foods/sources/` |
+| **Label** | [Open Food Facts](https://world.openfoodfacts.org) products sold in Singapore (nutrition labels typed in by volunteers) | Weekly, automatically (`.github/workflows/packaged-foods.yml` → `data/packaged.json`) |
+| **Estimate** | Chains with no published Singapore data (KFC, Jollibee, Burger King, Texas Chicken, Old Chang Kee, Starbucks, bubble tea, Stuff'd, Potato Corner…) | Edit `scripts/foods/sources/estimates.json` |
+| **Yours** | Manual entries, quick adds and anything you edit | — |
+
+Licences: SG FoodID data is used under [HPB's licence](https://file.go.gov.sg/termsofuse-hpbsgfoodid.pdf), which requires the credit shown in the app under Profile → "Where the nutrition numbers come from". Open Food Facts data is under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/).
+
+To add a food permanently for everyone, add it to `scripts/foods/sources/estimates.json` (or a new source file) and run `python3 scripts/foods/build.py`.
+
 ## How the data is stored
 
 | What | Where |
@@ -85,12 +101,14 @@ The security rules let each signed-in person read and write **only their own** p
 - **The camera needs HTTPS** (GitHub Pages provides it) and permission in the browser. If it's blocked, use "Take a photo instead" or type the barcode number.
 - **Dates follow each phone's clock and time zone.**
 - **Two phones editing the same day at the same moment:** the last save wins.
-- **Nutrition values are estimates** based on HPB data and brand labels; hawker portions vary by stall.
+- **Nutrition values are a guide.** Official values are for standard portions; hawker portions vary by stall, and estimates are only typical values.
+- **Weekly packaged-food refresh** commits to `main` from GitHub Actions. Pull before pushing your own changes (`git pull`).
 
 ## Files
 - `index.html`: layout and styles
 - `app.js`: app logic (login, sync, scanner, picks, history)
-- `foods.js`: Singapore food list
+- `data/foods.json`: the main food list (built by `scripts/foods/build.py` from `scripts/foods/sources/`)
+- `data/packaged.json`: packaged products (built weekly by `scripts/packaged/build.mjs`)
 - `firebase-config.js`: your Firebase project settings
 - `firestore.rules`: database security rules, pasted into the Firebase console
 - `manifest.json`, `sw.js`, `icons/`: home-screen app and offline support

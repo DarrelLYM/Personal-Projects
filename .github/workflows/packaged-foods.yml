@@ -1,0 +1,48 @@
+# Weekly refresh of packaged foods sold in Singapore (Open Food Facts) for the calorie tracker.
+# Free on public repos. Rewrites calorie-tracker/data/packaged.json and republishes the site.
+name: Refresh packaged foods
+
+on:
+  schedule:
+    - cron: "23 19 * * 0"   # Mondays ~3:23am Singapore time
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: packaged-foods
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Download Singapore products from Open Food Facts
+        run: node calorie-tracker/scripts/packaged/build.mjs
+      - name: Commit if changed
+        id: commit
+        run: |
+          if git diff --quiet -- calorie-tracker/data/packaged.json; then
+            echo "No changes."; echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add calorie-tracker/data/packaged.json
+            git commit -m "Refresh packaged foods from Open Food Facts"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Republish the site
+        # Pushes made by this job don't start the Pages build by themselves.
+        if: steps.commit.outputs.changed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
