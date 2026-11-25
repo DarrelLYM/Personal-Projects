@@ -1,4 +1,4 @@
-# Hourly reminders for Grace's Calorie Tracker.
+# Hourly reminders for Grace's Calorie Tracker. 
 # Free on public repos. Needs the repository secret FIREBASE_SERVICE_ACCOUNT (see calorie-tracker/README.md).
 name: Calorie tracker reminders
 
