@@ -241,6 +241,10 @@ function weekStart(d) { const s = new Date(d); s.setDate(s.getDate() - s.getDay(
 function renderHeader() {
   const name = state.profile?.username || "";
   $("#profileInitial").textContent = name ? name.charAt(0).toUpperCase() : "·";
+  const photo = state.profile?.photo;
+  const btn = $("#profileBtn");
+  btn.style.backgroundImage = photo && /^data:image\/(jpeg|png|webp);base64,/.test(photo) ? `url("${photo}")` : "";
+  btn.classList.toggle("has-photo", !!btn.style.backgroundImage);
   const sel = ymd(state.selectedDate);
   $("#title").textContent = sel === todayKey()
     ? (name ? `Hi, ${name}` : "Food Log")
@@ -1182,7 +1186,7 @@ const VIEWS = {
         <p><b>McDonald's Singapore</b>${counts.mcd ? ` · ${counts.mcd} items` : ""}: nutrition facts published on <a href="https://www.mcdonalds.com.sg/nutrition-calculator" target="_blank" rel="noopener">mcdonalds.com.sg</a> (current as of ${esc(info.mcdAsOf || "Dec 2023")}). McDonald's doesn't publish sugar.</p>
         <p><b>Ya Kun Kaya Toast</b>${counts.yakun ? ` · ${counts.yakun} drinks` : ""}: official Nutrition Information Panel on <a href="https://app.yakun.com/nutritional-information" target="_blank" rel="noopener">yakun.com</a>, per 100ml, converted to each cup size.</p>
         <p><b>Open Food Facts</b>${foodDb.packaged ? ` · ${foodDb.packaged.length.toLocaleString("en-SG")} packaged products` : ""}: data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">openfoodfacts.org</a>, available under the <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">Open Database License</a>. Refreshed weekly.</p>
-        ${counts.est ? `<p><b>Estimates</b> · ${counts.est} items from chains that don't publish nutrition data (e.g. KFC, Jollibee, bubble tea shops). Shown with an Estimate tag.</p>` : ""}
+        ${counts.est ? `<p><b>Estimates</b> · ${counts.est} items from chains that don't publish nutrition data (e.g. KFC, Jollibee, bubble tea shops), shown with an Estimate tag. Most are rough values from general knowledge, written by the AI assistant that built this app, not from a published source. Two (Stuff'd, Potato Corner) come from third-party sites, named on the item. Treat them as a starting point and edit them after logging if you know better.</p>` : ""}
         <p class="note">Nutrition varies with portion size, recipe and preparation. Use these numbers as a guide, not medical advice.</p>
       </div>`;
   },
@@ -1249,7 +1253,16 @@ const VIEWS = {
     renderMealTabs(false);
     const g = goals();
     const f = (id, label, val) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" inputmode="decimal" min="0" value="${esc(val)}"></div>`;
+    const hasPhoto = !!p.photo;
     body.innerHTML = `
+      <div class="photo-row">
+        <div class="avatar-lg"${hasPhoto ? ` style="background-image:url('${esc(p.photo)}')"` : ""}>${hasPhoto ? "" : esc((p.username || "?").charAt(0).toUpperCase())}</div>
+        <div class="photo-btns">
+          <button class="secondary" style="margin:0" id="photoPick">${hasPhoto ? "Change photo" : "Add profile photo"}</button>
+          ${hasPhoto ? '<button class="link-btn danger" style="padding:6px 0;text-align:left" id="photoRemove">Remove photo</button>' : ""}
+        </div>
+        <input type="file" id="photoFile" accept="image/*" hidden>
+      </div>
       <div class="kv">
         <div><span>Username</span><b>${esc(p.username || "")}</b></div>
         <div><span>Email</span><b>${esc(state.user?.email || p.email || "")}</b></div>
@@ -1292,6 +1305,22 @@ const VIEWS = {
       const v = (id) => num($("#" + id, body).value);
       const goalsNew = { kcal: v("gKcal") || 1800, protein: v("gProtein"), carbs: v("gCarbs"), fat: v("gFat"), sugar: v("gSugar"), sodium: v("gSodium") };
       try { await updateProfile({ goals: goalsNew }); renderAll(); closeSheet(); toast("Goals saved"); } catch { /* toast shown */ }
+    });
+    $("#photoPick", body).addEventListener("click", () => $("#photoFile", body).click());
+    $("#photoFile", body).addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      try {
+        const photo = await makeProfilePhoto(file);
+        await updateProfile({ photo });
+        renderAll(false);
+        show("profile", null, false);
+        toast("Photo updated");
+      } catch (err) { console.error(err); toast(err.message || "Couldn't use that photo. Try another one."); }
+    });
+    $("#photoRemove", body)?.addEventListener("click", async () => {
+      try { await updateProfile({ photo: null }); renderAll(false); show("profile", null, false); toast("Photo removed"); } catch { /* toast shown */ }
     });
     $("#exportCsv", body).addEventListener("click", (e) => withBusy(e.target, exportCsv));
     $("#backupJson", body).addEventListener("click", (e) => withBusy(e.target, downloadBackup));
@@ -1880,6 +1909,31 @@ function cancelDeleteFlow() {
   state.deleteFlow = false;
   history.replaceState(null, "", appUrl());
   location.replace(appUrl());
+}
+
+// ---------- Profile photo ----------
+// Stored as a small JPEG inside the profile document (Firebase file storage needs a paid plan).
+async function makeProfilePhoto(file) {
+  if (!/^image\//.test(file.type)) throw new Error("Pick an image file.");
+  if (file.size > 25 * 1024 * 1024) throw new Error("That photo is too large. Pick one under 25 MB.");
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+  catch {
+    const url = URL.createObjectURL(file);
+    try { const img = new Image(); img.src = url; await img.decode(); bmp = img; } finally { URL.revokeObjectURL(url); }
+  }
+  const w = bmp.width, h = bmp.height, side = Math.min(w, h);
+  const canvas = document.createElement("canvas");
+  for (const [size, q] of [[256, 0.82], [200, 0.75], [160, 0.7]]) {
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(bmp, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
+    const url = canvas.toDataURL("image/jpeg", q);
+    if (url.length < 60000) { bmp.close?.(); return url; }
+  }
+  bmp.close?.();
+  throw new Error("Couldn't shrink that photo enough. Try another one.");
 }
 
 // ---------- Export, backup and restore ----------

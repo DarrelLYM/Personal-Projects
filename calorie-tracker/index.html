@@ -79,6 +79,11 @@
   .icon-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.88); color: var(--purple-deep); position: relative; overflow: hidden; }
   .icon-btn svg { width: 22px; height: 22px; }
   .icon-btn.ghost { background: transparent; color: #fff; }
+  .icon-btn.has-photo { background-size: cover; background-position: center; }
+  .icon-btn.has-photo .initial { visibility: hidden; }
+  .photo-row { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+  .avatar-lg { width: 76px; height: 76px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 30px; background: radial-gradient(circle at 30% 30%, #8f6bff, var(--purple-deep)); background-size: cover; background-position: center; box-shadow: var(--shadow); }
+  .photo-btns { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
   .icon-btn .initial { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
   .date-jump { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
   .week { display: flex; align-items: center; gap: 2px; margin-top: 16px; }
