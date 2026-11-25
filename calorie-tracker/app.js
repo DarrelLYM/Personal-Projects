@@ -302,7 +302,8 @@ function readPrice(v) {
 const priceField = (id, val = "") => `<div class="field price-field"><label for="${id}">Price paid (optional)</label><div class="money-in"><span>$</span><input id="${id}" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(val ?? "")}"></div></div>`;
 
 // ---------- Rendering ----------
-function weekStart(d) { const s = new Date(d); s.setDate(s.getDate() - s.getDay()); s.setHours(0, 0, 0, 0); return s; }
+// Weeks run Monday to Sunday.
+function weekStart(d) { const s = new Date(d); s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); s.setHours(0, 0, 0, 0); return s; }
 
 function renderHeader() {
   const name = state.profile?.username || "";
@@ -331,7 +332,7 @@ function renderWeek() {
     const day = dayData(key);
     const has = MEALS.some((m) => day[m.id].length);
     html += `<button class="day${key === sel ? " sel" : ""}${key === today ? " today" : ""}" data-date="${key}" aria-label="${d.toLocaleDateString("en-SG", { weekday: "long", day: "numeric", month: "long" })}"${key === sel ? ' aria-current="date"' : ""}>
-      <span class="dow">${dows[i]}</span><span class="dnum">${d.getDate()}</span>${has ? '<span class="dot"></span>' : ""}</button>`;
+      <span class="dow">${dows[d.getDay()]}</span><span class="dnum">${d.getDate()}</span>${has ? '<span class="dot"></span>' : ""}</button>`;
   }
   $("#days").innerHTML = html;
 }
@@ -1456,22 +1457,32 @@ async function runWeightStats() {
   $("#wsNext").disabled = wstat.offset >= 0;
   out.innerHTML = '<div class="spinner"></div>';
   let days;
-  try { days = await loadRange(ymd(a), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; return; }
+  // Also load the 60 days before, to find the starting weight when the first day of the period has no reading.
+  const before = new Date(a); before.setDate(a.getDate() - 60);
+  try { days = await loadRange(ymd(before), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; return; }
   if (!$("#wsOut")) return;
-  const pts = days.filter(([, d]) => hasWeight(d)).map(([k, d]) => [k, d.weight]);
+  const allPts = days.filter(([, d]) => hasWeight(d)).map(([k, d]) => [k, d.weight]);
+  const pts = allPts.filter(([k]) => k >= ymd(a));
+  const earlier = allPts.filter(([k]) => k < ymd(a)).pop() || null;
   if (!pts.length) { out.innerHTML = `<p class="muted">No weight readings ${wstat.period === "week" ? "this week" : "in this period"}. Log one from the Weight card on the main screen.</p>`; return; }
-  const first = pts[0], last = pts[pts.length - 1];
-  const change = Math.round((last[1] - first[1]) * 10) / 10;
+  // Change = end of the chart (latest reading in the period) minus its start: the reading on the
+  // period's first day, or else the last reading before the period, or else the period's first reading.
+  const last = pts[pts.length - 1];
+  const start = pts[0][0] === ymd(a) ? pts[0] : earlier || pts[0];
+  const change = Math.round((last[1] - start[1]) * 10) / 10;
+  const short = (k) => prettyDate(k, { weekday: "short", day: "numeric", month: "short" });
+  const dm = (k) => prettyDate(k, { day: "numeric", month: "short" });
+  const changeFrom = start === last ? "Only one reading" : `${dm(start[0])} → ${last[0] === todayKey() ? "today" : dm(last[0])}`;
   const avgW = pts.reduce((s, p) => s + p[1], 0) / pts.length;
   out.innerHTML = `
     <div class="stat-row">
       <div class="stat"><div class="k">Latest</div><div class="v">${last[1].toFixed(1)}<small>kg</small></div></div>
-      <div class="stat"><div class="k">Change</div><div class="v">${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(1)}<small>kg</small></div></div>
+      <div class="stat"><div class="k">Change</div><div class="v">${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(1)}<small>kg</small></div><div class="k2">${esc(changeFrom)}</div></div>
       <div class="stat"><div class="k">Average</div><div class="v">${avgW.toFixed(1)}<small>kg</small></div></div>
     </div>
     <div class="card-box">${weightChart(pts, a, b, wstat.period)}</div>
     <ul class="top-foods" style="margin-top:12px">${pts.slice().reverse().slice(0, 14).map(([k, v]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}</span><span>${v.toFixed(1)} kg</span></li>`).join("")}</ul>
-    <p class="note">${pts.length} reading${pts.length === 1 ? "" : "s"}. Change is from the first reading in this period (${esc(prettyDate(first[0]))}).</p>`;
+    <p class="note">${pts.length} reading${pts.length === 1 ? "" : "s"} in this period. Change compares the start of the chart with its latest reading${start === earlier ? ` (no reading on ${esc(short(ymd(a)))}, so it starts from your last reading before that, on ${esc(short(start[0]))})` : ""}.</p>`;
 }
 
 function renderStatTab(body) {
