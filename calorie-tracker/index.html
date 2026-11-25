@@ -1,7 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Grace's Calorie Tracker</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#4c1fd6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calories">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
 <style>
-  /* Layout: gradient header band (date strip + nutrient bars) over a lavender list of four meals, with a floating Scan / Manual / Ask bar. */
+  /* Layout: gradient header band (date strip + nutrient bars) over a lavender list of four meals, with a floating Scan / Manual / History bar. */
   :root {
     --purple: #6a3cf0;
     --purple-2: #8b5cf6;
@@ -12,57 +26,61 @@
     --card: #ffffff;
     --bg: #f1eefb;
     --soft: rgba(106,60,240,.10);
-    --line: rgba(106,60,240,.12);
+    --line: rgba(106,60,240,.14);
     --track: rgba(255,255,255,.75);
     --over: #e5484d;
-    --good: #12a150;
     --shadow: 0 6px 24px rgba(76, 31, 214, .12);
     --hero-fade: rgba(241,238,251,0);
     --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     --font-display: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+    :root {
       --ink: #f2efff; --ink-2: #c9c2e6; --ink-3: #9a93b8;
-      --card: #231d3c; --bg: #15112a; --soft: rgba(160,130,255,.16); --line: rgba(160,130,255,.18);
+      --card: #231d3c; --bg: #15112a; --soft: rgba(160,130,255,.16); --line: rgba(160,130,255,.2);
       --track: rgba(255,255,255,.2); --shadow: 0 6px 24px rgba(0,0,0,.35); --hero-fade: rgba(21,17,42,0);
       color-scheme: dark;
     }
   }
-  :root[data-theme="dark"] {
-    --ink: #f2efff; --ink-2: #c9c2e6; --ink-3: #9a93b8;
-    --card: #231d3c; --bg: #15112a; --soft: rgba(160,130,255,.16); --line: rgba(160,130,255,.18);
-    --track: rgba(255,255,255,.2); --shadow: 0 6px 24px rgba(0,0,0,.35); --hero-fade: rgba(21,17,42,0);
-    color-scheme: dark;
-  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body {
-    font-family: var(--font); color: var(--ink); background: var(--bg);
-    min-height: 100vh; overflow-x: hidden;
-  }
+  html, body { margin: 0; }
+  body { font-family: var(--font); font-size: 14px; color: var(--ink); background: var(--bg); min-height: 100vh; overflow-x: hidden; }
+  [hidden] { display: none !important; }
   button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
-  button:focus-visible, input:focus-visible, label:focus-within { outline: 2px solid var(--purple-2); outline-offset: 2px; }
-  input, select, textarea { font: inherit; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--purple-2); outline-offset: 2px; }
+  input { font: inherit; color: var(--ink); }
   .wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
+  /* ---------- Sign-in screens ---------- */
+  .auth { min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(180deg, var(--purple-deep) 0%, var(--purple) 30%, var(--bg) 62%); }
+  .auth .wrap { width: 100%; padding-top: calc(env(safe-area-inset-top, 0px) + 56px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px); }
+  .auth-brand { color: #fff; text-align: center; margin-bottom: 28px; }
+  .auth-brand .logo { width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 14px; display: block; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .auth-brand h1 { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 700; text-wrap: balance; }
+  .auth-brand p { margin: 6px 0 0; opacity: .85; font-size: 15px; }
+  .auth-card { background: var(--card); border-radius: 24px; padding: 22px 18px; box-shadow: var(--shadow); max-width: 440px; margin: 0 auto; }
+  .auth-card h2 { margin: 0 0 4px; font-size: 20px; font-family: var(--font-display); }
+  .auth-card .lead { margin: 0 0 16px; color: var(--ink-3); font-size: 14px; line-height: 1.5; }
+  .auth-card .stack { display: grid; gap: 12px; }
+  .auth-links { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+  .auth-links button { color: var(--purple); font-weight: 600; font-size: 14px; padding: 6px 0; }
+  .form-msg { font-size: 13px; line-height: 1.45; margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; }
+  .form-msg.err { background: rgba(229,72,77,.12); color: var(--over); }
+  .form-msg.ok { background: rgba(18,161,80,.12); color: #0e8a45; }
+  .setup { max-width: 520px; margin: 0 auto; line-height: 1.6; color: var(--ink-2); }
+
   /* ---------- Header band ---------- */
-  .hero {
-    background: linear-gradient(180deg, var(--purple-deep) 0%, var(--purple) 38%, var(--purple-2) 72%, var(--hero-fade) 100%);
-    margin-top: calc(-1 * env(safe-area-inset-top, 0px));
-    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
-    padding-bottom: 26px;
-    color: #fff;
-  }
+  .hero { background: linear-gradient(180deg, var(--purple-deep) 0%, var(--purple) 38%, var(--purple-2) 72%, var(--hero-fade) 100%); padding-top: calc(env(safe-area-inset-top, 0px) + 12px); padding-bottom: 26px; color: #fff; }
   .topbar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
   .brand { text-align: center; min-width: 0; }
   .brand .app { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; opacity: .85; font-weight: 600; }
-  .brand h1 { margin: 2px 0 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-wrap: balance; }
+  .brand h1 { margin: 2px 0 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .icon-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.88); color: var(--purple-deep); position: relative; overflow: hidden; }
   .icon-btn svg { width: 22px; height: 22px; }
   .icon-btn.ghost { background: transparent; color: #fff; }
   .icon-btn .initial { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
   .date-jump { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
-
   .week { display: flex; align-items: center; gap: 2px; margin-top: 16px; }
   .week-nav { width: 22px; height: 54px; color: rgba(255,255,255,.85); display: grid; place-items: center; flex: none; }
   .week-nav svg { width: 16px; height: 16px; }
@@ -74,7 +92,6 @@
   .day.today:not(.sel) .dnum { text-decoration: underline; text-underline-offset: 4px; }
   .day .dot { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: #fff; }
   .day.sel .dot { background: var(--purple); }
-
   .bars { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr; gap: 8px; margin-top: 18px; }
   .bar { min-width: 0; }
   .bar .track { height: 12px; border-radius: 99px; background: var(--track); overflow: hidden; }
@@ -83,7 +100,6 @@
   .bar.over .fill { background: var(--over); }
   .bar .lbl { margin-top: 7px; font-size: 11px; color: rgba(255,255,255,.96); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .2px; font-variant-numeric: tabular-nums; }
   .bar .lbl.goal { margin-top: 1px; font-size: 10.5px; color: rgba(255,255,255,.75); }
-
   .banner { margin-top: 12px; font-size: 12px; background: rgba(255,255,255,.18); border-radius: 12px; padding: 8px 12px; line-height: 1.4; }
 
   /* ---------- Main ---------- */
@@ -105,7 +121,6 @@
   .e-del { width: 36px; height: 36px; border-radius: 50%; color: var(--ink-3); display: grid; place-items: center; flex: none; }
   .e-del svg { width: 16px; height: 16px; }
 
-  /* Recommendations */
   .recs { margin-top: 24px; }
   .recs h3 { margin: 0; font-family: var(--font-display); font-size: 18px; font-weight: 600; }
   .recs .why { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
@@ -120,8 +135,6 @@
   .rec .r-macros { font-size: 12px; color: var(--ink-3); }
   .rec .r-fit { font-size: 11px; color: var(--ink-2); }
   .sub-head { font-size: 13px; color: var(--ink-3); font-weight: 600; margin: 10px 0 0; text-transform: uppercase; letter-spacing: .6px; }
-  .ask-pick { margin-top: 6px; display: inline-flex; align-items: center; gap: 6px; color: var(--purple); font-weight: 600; font-size: 14px; padding: 8px 0; }
-  .ask-pick svg { width: 18px; height: 18px; }
 
   .summary { margin-top: 22px; background: var(--card); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); }
   .summary h3 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
@@ -131,11 +144,10 @@
   .summary .v { font-size: 17px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .summary .v small { font-size: 12px; color: var(--ink-3); font-weight: 400; }
 
-  /* Floating action bar */
   .fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); display: flex; gap: 6px; padding: 6px; border-radius: 99px; background: var(--card); box-shadow: 0 10px 30px rgba(76,31,214,.28); z-index: 20; }
   .fab button { display: flex; align-items: center; gap: 6px; padding: 12px 16px; border-radius: 99px; font-weight: 600; font-size: 15px; white-space: nowrap; }
   .fab .scan { background: var(--purple); color: #fff; }
-  .fab .manual, .fab .ask { background: var(--soft); color: var(--purple); }
+  .fab .manual, .fab .hist { background: var(--soft); color: var(--purple); }
   .fab svg { width: 19px; height: 19px; }
 
   /* ---------- Bottom sheet ---------- */
@@ -148,9 +160,7 @@
   .sheet-head h3 { flex: 1; margin: 0; font-size: 18px; font-weight: 600; min-width: 0; }
   .round { width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; flex: none; }
   .round svg { width: 18px; height: 18px; }
-  .sheet-body { overflow-y: auto; padding: 0 16px 20px; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
-  .sheet-foot { flex: none; padding: 8px 16px 12px; border-top: 1px solid var(--line); }
-
+  .sheet-body { overflow-y: auto; padding: 0 16px 24px; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
   .meal-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 10px; flex: none; scrollbar-width: none; }
   .meal-tabs::-webkit-scrollbar { display: none; }
   .meal-tabs button { padding: 8px 14px; border-radius: 99px; background: var(--card); font-size: 14px; color: var(--ink-2); white-space: nowrap; }
@@ -193,7 +203,7 @@
   .stepper button { width: 40px; height: 40px; border-radius: 50%; background: var(--card); font-size: 22px; font-weight: 500; color: var(--purple); }
   .stepper input { width: 56px; text-align: center; border: 0; background: transparent; font-size: 17px; font-weight: 600; outline: 0; }
   .primary { width: 100%; margin-top: 16px; padding: 15px; border-radius: 16px; background: var(--purple); color: #fff; font-weight: 600; font-size: 16px; }
-  .primary:disabled { opacity: .5; }
+  .primary:disabled { opacity: .55; }
   .secondary { width: 100%; margin-top: 10px; padding: 13px; border-radius: 16px; background: var(--soft); color: var(--purple); font-weight: 600; font-size: 15px; }
   .danger { color: var(--over); }
   .danger.armed { background: var(--over); color: #fff; }
@@ -203,40 +213,51 @@
   .field { min-width: 0; }
   .field label { display: block; font-size: 12px; color: var(--ink-3); margin: 0 0 4px 4px; }
   .field input { width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 12px; font-size: 16px; outline: 0; }
+  .auth-card .field input { background: var(--bg); }
   .field input:focus { border-color: var(--purple); }
+  .field .hint { font-size: 12px; color: var(--ink-3); margin: 4px 0 0 4px; }
   .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink-2); margin-top: 12px; line-height: 1.4; }
   .check input { width: 20px; height: 20px; accent-color: var(--purple); flex: none; margin: 0; }
   .note { font-size: 12px; color: var(--ink-3); line-height: 1.5; margin-top: 10px; }
+  .kv { background: var(--card); border-radius: 16px; padding: 4px 14px; }
+  .kv div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .kv div:last-child { border-bottom: 0; }
+  .kv span { color: var(--ink-3); }
+  .kv b { font-weight: 600; overflow-wrap: anywhere; text-align: right; }
 
-  .acct-list { display: grid; gap: 8px; }
-  .acct { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--card); border-radius: 16px; padding: 12px; box-shadow: var(--shadow); }
-  .acct .av { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 18px; background: radial-gradient(circle at 30% 30%, #8f6bff, var(--purple-deep)); flex: none; }
-  .acct .a-name { font-weight: 600; font-size: 16px; }
-  .acct .a-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
-  .acct.cur { outline: 2px solid var(--purple); }
-
-  .scan-preview { width: 100%; border-radius: 16px; max-height: 240px; object-fit: cover; display: block; }
+  /* Scanner */
+  .scanner { position: relative; border-radius: 20px; overflow: hidden; background: #000; aspect-ratio: 3 / 4; max-height: 52vh; width: 100%; }
+  .scanner video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .scanner .frame { position: absolute; left: 12%; right: 12%; top: 38%; height: 24%; border: 3px solid rgba(255,255,255,.9); border-radius: 16px; box-shadow: 0 0 0 999px rgba(0,0,0,.35); }
+  .scanner .frame::after { content: ""; position: absolute; left: 8%; right: 8%; top: 50%; height: 2px; background: #43e97b; animation: sweep 1.6s ease-in-out infinite alternate; }
+  @keyframes sweep { from { transform: translateY(-28px); } to { transform: translateY(28px); } }
+  .scan-status { text-align: center; color: var(--ink-2); font-size: 14px; margin: 12px 0 0; line-height: 1.5; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row2 .secondary { margin-top: 12px; }
+  .barcode-form { display: flex; gap: 8px; margin-top: 12px; }
+  .barcode-form input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 12px; font-size: 16px; outline: 0; }
+  .barcode-form button { padding: 0 16px; border-radius: 12px; background: var(--purple); color: #fff; font-weight: 600; }
   .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--soft); border-top-color: var(--purple); animation: spin 1s linear infinite; margin: 18px auto 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .ai-item { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border-radius: 14px; padding: 12px; margin-bottom: 8px; }
-  .ai-item input { width: 20px; height: 20px; accent-color: var(--purple); margin-top: 2px; flex: none; }
 
-  /* Chat */
-  .chat { display: flex; flex-direction: column; gap: 10px; }
-  .msg { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
-  .msg.user { align-self: flex-end; background: var(--purple); color: #fff; border-bottom-right-radius: 6px; }
-  .msg.bot { align-self: flex-start; background: var(--card); box-shadow: var(--shadow); border-bottom-left-radius: 6px; }
-  .msg.bot p { margin: 0 0 8px; } .msg.bot p:last-child { margin: 0; }
-  .msg.bot ul { margin: 4px 0 8px; padding-left: 20px; }
-  .msg.status { align-self: flex-start; font-size: 13px; color: var(--ink-3); padding: 2px 4px; }
-  .chat-input { display: flex; gap: 8px; align-items: flex-end; }
-  .chat-input textarea { flex: 1; min-width: 0; resize: none; border: 1px solid var(--line); background: var(--card); border-radius: 18px; padding: 11px 14px; font-size: 16px; max-height: 120px; outline: 0; }
-  .chat-input textarea:focus { border-color: var(--purple); }
-  .send { width: 44px; height: 44px; border-radius: 50%; background: var(--purple); color: #fff; display: grid; place-items: center; flex: none; }
-  .send svg { width: 20px; height: 20px; }
-  .send.stop { background: var(--ink); color: var(--bg); }
-  .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .suggest button { padding: 8px 12px; border-radius: 99px; background: var(--card); font-size: 13px; color: var(--ink-2); text-align: left; box-shadow: var(--shadow); }
+  /* History */
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+  .stat { background: var(--card); border-radius: 14px; padding: 12px; box-shadow: var(--shadow); min-width: 0; }
+  .stat .k { font-size: 12px; color: var(--ink-3); }
+  .stat .v { font-family: var(--font-display); font-size: 22px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--ink-3); }
+  .hist-day { background: var(--card); border-radius: 14px; padding: 12px; margin-top: 8px; }
+  .hist-day .hd { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; font-size: 14px; }
+  .hist-day .hd span { color: var(--ink-3); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hist-day ul { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; color: var(--ink-2); display: grid; gap: 3px; }
+  .hist-day li { display: flex; justify-content: space-between; gap: 10px; }
+  .hist-day li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink-3); }
+  .daybars { display: flex; align-items: flex-end; gap: 3px; height: 90px; margin-top: 14px; padding: 10px; background: var(--card); border-radius: 14px; }
+  .daybars i { flex: 1; min-width: 2px; background: var(--purple-2); border-radius: 3px 3px 0 0; }
+  .daybars i.over { background: var(--over); }
+  .top-foods { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .top-foods li { display: flex; justify-content: space-between; gap: 10px; background: var(--card); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+  .top-foods li span:last-child { color: var(--ink-3); white-space: nowrap; }
 
   .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; transition: opacity .25s, transform .25s; z-index: 50; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
@@ -246,47 +267,60 @@
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+</head>
+<body>
 
-<header class="hero">
+<!-- Sign-in / sign-up / forgot password -->
+<section class="auth" id="authScreen" hidden>
   <div class="wrap">
-    <div class="topbar">
-      <label class="icon-btn ghost" aria-label="Jump to a date" title="Jump to a date">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        <input type="date" id="dateJump" class="date-jump">
-      </label>
-      <div class="brand">
-        <div class="app">Grace's Calorie Tracker</div>
-        <h1 id="title">Food Log</h1>
-      </div>
-      <button class="icon-btn" id="accountBtn" aria-label="Account and settings"><span class="initial" id="accountInitial">·</span></button>
+    <div class="auth-brand">
+      <img class="logo" src="icons/icon-192.png" alt="">
+      <h1>Grace's Calorie Tracker</h1>
+      <p>Track what you eat in Singapore</p>
     </div>
-
-    <div class="week">
-      <button class="week-nav" id="prevWeek" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <div class="days" id="days"></div>
-      <button class="week-nav" id="nextWeek" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
-    </div>
-
-    <div class="bars" id="bars"></div>
-    <div class="banner" id="banner" hidden></div>
+    <div class="auth-card" id="authCard"></div>
   </div>
-</header>
+</section>
 
-<main class="wrap">
-  <section id="meals"></section>
-  <section class="recs" id="recs"></section>
-  <section class="summary" id="summary"></section>
-</main>
+<!-- Main app -->
+<div id="appScreen" hidden>
+  <header class="hero">
+    <div class="wrap">
+      <div class="topbar">
+        <label class="icon-btn ghost" aria-label="Jump to a date" title="Jump to a date">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <input type="date" id="dateJump" class="date-jump">
+        </label>
+        <div class="brand">
+          <div class="app">Grace's Calorie Tracker</div>
+          <h1 id="title">Food Log</h1>
+        </div>
+        <button class="icon-btn" id="profileBtn" aria-label="Profile and settings"><span class="initial" id="profileInitial">·</span></button>
+      </div>
+      <div class="week">
+        <button class="week-nav" id="prevWeek" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div class="days" id="days"></div>
+        <button class="week-nav" id="nextWeek" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="banner" id="banner" hidden></div>
+    </div>
+  </header>
 
-<div class="fab">
-  <button class="scan" id="fabScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>Scan</button>
-  <button class="manual" id="fabManual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Manual</button>
-  <button class="ask" id="fabAsk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Ask</button>
+  <main class="wrap">
+    <section id="meals"></section>
+    <section class="recs" id="recs"></section>
+    <section class="summary" id="summary"></section>
+  </main>
+
+  <div class="fab">
+    <button class="scan" id="fabScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 9v6M10 9v6M13 9v6M16 9v6"/></svg>Scan</button>
+    <button class="manual" id="fabManual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Manual</button>
+    <button class="hist" id="fabHistory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History</button>
+  </div>
 </div>
 
-<input type="file" accept="image/*" capture="environment" id="cameraInput" hidden>
+<input type="file" accept="image/*" capture="environment" id="photoInput" hidden>
 
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
@@ -298,10 +332,11 @@
   </div>
   <div class="meal-tabs" id="mealTabs"></div>
   <div class="sheet-body" id="sheetBody"></div>
-  <div class="sheet-foot" id="sheetFoot" hidden></div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="foods.js"></script>
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

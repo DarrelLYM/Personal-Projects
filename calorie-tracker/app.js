@@ -1,12 +1,13 @@
 // Grace's Calorie Tracker
-// Data lives in the artifact's shared database (synced across devices and people).
-// Layout of the store:
-//   accounts/{accountId}                 { name, goals, linkedUsers[], recents[], customFoods[], createdAt }
-//   accounts/{accountId}/months/{YYYY-MM} { month, days: { "YYYY-MM-DD": { breakfast[], lunch[], dinner[], supper[] } } }
-// One document per account per month keeps 10 years at ~120 documents per account.
-(() => {
-"use strict";
+// Free stack: GitHub Pages (hosting) + Firebase Authentication (login) + Cloud Firestore (data).
+// Firestore layout (see firestore.rules):
+//   users/{uid}                  { username, email, goals, recents[], customFoods[], createdAt }
+//   users/{uid}/months/{YYYY-MM} { month, days: { "YYYY-MM-DD": { breakfast[], lunch[], dinner[], supper[] } } }
+//   usernames/{lowercase name}   { uid, email }   lets people sign in with a username
+// One document per user per month: 10 years is about 120 documents per person.
+import { firebaseConfig } from "./firebase-config.js";
 
+const FB = "https://www.gstatic.com/firebasejs/10.12.2/";
 const MEALS = [
   { id: "breakfast", name: "Breakfast" },
   { id: "lunch", name: "Lunch" },
@@ -21,11 +22,11 @@ const BARS = [
   { id: "sugar", short: "S", unit: "g" },
 ];
 const NUTRI = ["kcal", "protein", "carbs", "fat", "sugar", "sodium"];
+const HISTORY_YEARS = 10;
 const goalsFor = (kcal) => ({
   kcal, protein: Math.round((kcal * 0.25) / 4), carbs: Math.round((kcal * 0.5) / 4),
   fat: Math.round((kcal * 0.25) / 9), sugar: 40, sodium: 2000,
 });
-const HISTORY_YEARS = 10;
 
 // ---------- Helpers ----------
 const $ = (s, root = document) => root.querySelector(s);
@@ -40,8 +41,7 @@ const monthOf = (dateKey) => dateKey.slice(0, 7);
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const todayKey = () => ymd(new Date());
 const mealName = (id) => MEALS.find((m) => m.id === id)?.name || id;
-const lsGet = (k, f) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch { return f; } };
-const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* per-device convenience only */ } };
+const prettyDate = (key, opts = { weekday: "short", day: "numeric", month: "short" }) => parseYmd(key).toLocaleDateString("en-SG", opts);
 
 function mealForNow() {
   const h = new Date().getHours();
@@ -64,77 +64,52 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
-  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>',
+  barcode: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 9v6M10 9v6M13 9v6M16 9v6"/></svg>',
   pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>',
-  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
-  stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>',
-  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
 };
 
-// ---------- Device-only fallback store ----------
-// Used only when the page is opened outside Claude (or signed out), so the app still works.
-function createLocalDb() {
-  const KEY = "gct.localdb";
-  const data = lsGet(KEY, {});
-  const listeners = new Set();
-  const persist = () => { lsSet(KEY, data); queueMicrotask(() => listeners.forEach((l) => l())); };
-  const clone = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
-  const snap = (path) => ({ id: path.split("/").pop(), exists: path in data, data: () => clone(data[path]), metadata: { fromCache: false, hasPendingWrites: false } });
-  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
-  const merge = (a, b) => {
-    const out = { ...a };
-    for (const [k, v] of Object.entries(b)) out[k] = isObj(v) && isObj(out[k]) ? merge(out[k], v) : v;
-    return out;
-  };
-  const docRef = (path) => ({
-    id: path.split("/").pop(), path,
-    get: async () => snap(path),
-    set: async (v) => { data[path] = clone(v); persist(); },
-    update: async (v) => { if (!(path in data)) throw { code: "invalid_argument", message: "missing" }; data[path] = merge(data[path], clone(v)); persist(); },
-    delete: async () => { delete data[path]; persist(); },
-    onSnapshot(next) { const l = () => next(snap(path)); listeners.add(l); queueMicrotask(l); return () => listeners.delete(l); },
-    collection: (sub) => collRef(path + "/" + sub),
-  });
-  const collRef = (path, filters = []) => {
-    const run = () => {
-      const depth = path.split("/").length + 1;
-      const docs = Object.keys(data).filter((p) => p.startsWith(path + "/") && p.split("/").length === depth).sort()
-        .filter((p) => filters.every(([f, op, v]) => {
-          const x = data[p][f];
-          return op === "array-contains" ? Array.isArray(x) && x.includes(v) : op === "==" ? x === v : true;
-        })).map(snap);
-      return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: { fromCache: false, hasPendingWrites: false } };
-    };
-    return {
-      path,
-      doc: (id) => docRef(path + "/" + (id || uid())),
-      where: (f, op, v) => collRef(path, [...filters, [f, op, v]]),
-      orderBy() { return this; }, limit() { return this; },
-      get: async () => run(),
-      onSnapshot(next) { const l = () => next(run()); listeners.add(l); queueMicrotask(l); return () => listeners.delete(l); },
-    };
-  };
-  return { doc: docRef, collection: (p) => collRef(p), local: true };
-}
-
-// ---------- App state ----------
+// ---------- State ----------
+const fb = {};          // Firebase functions, loaded on boot
 const state = {
-  db: null,
-  sample: null,
-  sampleLimits: null,
-  myId: null,
-  mode: "loading",          // "cloud" | "local"
-  accounts: [],             // [{id, ...data}]
-  accountsLoaded: false,
-  accountId: null,
-  months: {},               // "accId|YYYY-MM" -> { exists, days }
-  monthSubs: new Map(),     // key -> unsubscribe
+  user: null,           // Firebase auth user
+  profile: null,        // users/{uid} data
+  profileUnsub: null,
+  months: {},           // "YYYY-MM" -> { days }
+  monthSubs: new Map(), // "YYYY-MM" -> unsubscribe
   selectedDate: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })(),
+  signingUp: false,
   recPlan: null,
   recList: [],
 };
-const account = () => state.accounts.find((a) => a.id === state.accountId) || null;
-const goals = () => Object.assign(goalsFor(1800), account()?.goals || {});
+const goals = () => Object.assign(goalsFor(1800), state.profile?.goals || {});
+const userPath = () => `users/${state.user.uid}`;
+const monthPath = (month) => `${userPath()}/months/${month}`;
+
+// ---------- Firebase boot ----------
+async function loadFirebase() {
+  const [app, auth, fs] = await Promise.all([
+    import(FB + "firebase-app.js"), import(FB + "firebase-auth.js"), import(FB + "firebase-firestore.js"),
+  ]);
+  const fbApp = app.initializeApp(firebaseConfig);
+  fb.auth = auth.getAuth(fbApp);
+  let db;
+  try {
+    db = fs.initializeFirestore(fbApp, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+  } catch {
+    db = fs.getFirestore(fbApp);
+  }
+  Object.assign(fb, {
+    db,
+    onAuthStateChanged: auth.onAuthStateChanged,
+    signIn: auth.signInWithEmailAndPassword,
+    signUp: auth.createUserWithEmailAndPassword,
+    sendReset: auth.sendPasswordResetEmail,
+    signOut: auth.signOut,
+    doc: (path) => fs.doc(db, path),
+    getDoc: fs.getDoc, setDoc: fs.setDoc, deleteDoc: fs.deleteDoc, onSnapshot: fs.onSnapshot,
+    monthsBetween: (from, to) => fs.getDocs(fs.query(fs.collection(db, `${userPath()}/months`), fs.where("month", ">=", from), fs.where("month", "<=", to))),
+  });
+}
 
 // ---------- Writes: one at a time per document ----------
 const writeChains = new Map();
@@ -143,146 +118,104 @@ function queueWrite(path, fn) {
   const next = prev.catch(() => {}).then(fn);
   writeChains.set(path, next);
   return next.catch((e) => {
-    const code = e?.code;
-    if (code === "quota_exceeded") toast("The shared storage is full. Delete an unused account to free space.");
-    else if (code === "invalid_argument") toast("You can view this tracker but not save to it. Ask the owner to make you an Editor.");
+    console.error(e);
+    if (e?.code === "permission-denied") toast("You're not allowed to save this. Try signing out and in again.");
+    else if (e?.code === "resource-exhausted") toast("The free database limit for today was reached. Try again tomorrow.");
     else toast("Couldn't save. Check your connection and try again.");
     throw e;
   });
 }
 
-const monthPath = (accId, month) => `accounts/${accId}/months/${month}`;
-const monthKey = (accId, month) => `${accId}|${month}`;
-
-function dayData(dateKey, accId = state.accountId) {
-  const m = state.months[monthKey(accId, monthOf(dateKey))];
-  const d = m?.days?.[dateKey] || {};
+function dayData(dateKey) {
+  const d = state.months[monthOf(dateKey)]?.days?.[dateKey] || {};
   const out = {};
   for (const meal of MEALS) out[meal.id] = Array.isArray(d[meal.id]) ? d[meal.id] : [];
   return out;
 }
 
 function writeDay(dateKey, day) {
-  const accId = state.accountId;
   const month = monthOf(dateKey);
-  const key = monthKey(accId, month);
-  const cached = state.months[key] || { exists: false, days: {} };
-  state.months[key] = { ...cached, days: { ...cached.days, [dateKey]: day } };
+  const cached = state.months[month] || { days: {} };
+  state.months[month] = { ...cached, days: { ...cached.days, [dateKey]: day } };
   renderAll();
-  const ref = state.db.doc(monthPath(accId, month));
-  return queueWrite(ref.path, async () => {
-    const now = new Date().toISOString();
-    const snap = await ref.get();
-    if (snap.exists) await ref.update({ days: { [dateKey]: day }, updatedAt: now });
-    else await ref.set({ month, days: { [dateKey]: day }, updatedAt: now });
-  });
+  const path = monthPath(month);
+  // merge: true deep-merges maps, so only this day is replaced inside the month document.
+  return queueWrite(path, () => fb.setDoc(fb.doc(path), { month, days: { [dateKey]: day }, updatedAt: new Date().toISOString() }, { merge: true }));
 }
 
-function updateAccount(patch) {
-  const a = account();
-  if (!a) return Promise.resolve();
-  Object.assign(a, patch);
-  const ref = state.db.doc(`accounts/${a.id}`);
-  return queueWrite(ref.path, () => ref.update(patch));
+function updateProfile(patch) {
+  if (!state.profile) return Promise.resolve();
+  state.profile = { ...state.profile, ...patch };
+  const path = userPath();
+  return queueWrite(path, () => fb.setDoc(fb.doc(path), patch, { merge: true }));
 }
 
 // ---------- Subscriptions ----------
-let loadTimer = null;
 function showBanner(text) {
   const b = $("#banner");
   b.hidden = !text;
   b.textContent = text || "";
 }
 
-function subscribeAccounts() {
-  loadTimer = setTimeout(() => { if (!state.accountsLoaded) showBanner("Can't reach your saved data yet. It will appear when the connection comes back."); }, 10000);
-  state.db.collection("accounts").onSnapshot((snap) => {
-    if (!snap.metadata?.fromCache) { clearTimeout(loadTimer); if (state.mode === "cloud") showBanner(""); }
-    state.accounts = snap.docs.filter((d) => d.exists).map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
-    const firstLoad = !state.accountsLoaded;
-    state.accountsLoaded = true;
-    if (!account()) {
-      state.accountId = null;
-      const linked = state.myId && state.accounts.find((a) => (a.linkedUsers || []).includes(state.myId));
-      const last = state.accounts.find((a) => a.id === lsGet("gct.lastAccount", null));
-      const pick = linked || last;
-      if (pick) selectAccount(pick.id);
-      else if (firstLoad || !sheetOpen()) openSheet(null, "accounts");
-      else refreshAccountsView();
-    } else refreshAccountsView();
-    renderAll();
+function subscribeProfile() {
+  state.profileUnsub?.();
+  const ref = fb.doc(userPath());
+  state.profileUnsub = fb.onSnapshot(ref, async (snap) => {
+    if (snap.exists()) {
+      state.profile = snap.data();
+      renderAll();
+      return;
+    }
+    if (state.signingUp || snap.metadata.fromCache) return;
+    // Signed in but no profile yet (e.g. created in the Firebase console): make a default one.
+    const email = state.user.email || "";
+    const profile = { username: email.split("@")[0] || "Me", email, goals: goalsFor(1800), recents: [], customFoods: [], createdAt: new Date().toISOString() };
+    try { await fb.setDoc(ref, profile); } catch (e) { console.error(e); }
   }, (e) => {
-    clearTimeout(loadTimer);
-    showBanner(e?.code === "revoked" ? "Access to this tracker was removed." : "Couldn't load your data. Reload the page to try again.");
+    console.error(e);
+    showBanner("Couldn't load your profile. Check your connection, then reload the page.");
   });
 }
 
-function refreshAccountsView() {
-  const top = sheet.stack[sheet.stack.length - 1];
-  if (sheetOpen() && top && top[0] === "accounts") show("accounts", null, false);
-}
-
-function selectAccount(id) {
-  if (state.accountId === id) return;
-  state.accountId = id;
-  lsSet("gct.lastAccount", id);
-  for (const unsub of state.monthSubs.values()) unsub();
-  state.monthSubs.clear();
-  chat.turns = [];
-  renderAll();
-}
-
 function ensureMonthSubs() {
-  if (!state.accountId || !state.db) return;
+  if (!state.user) return;
   const start = weekStart(state.selectedDate);
   const end = new Date(start); end.setDate(start.getDate() + 6);
-  const needed = new Set([monthOf(ymd(start)), monthOf(ymd(end)), monthOf(todayKey())].map((m) => monthKey(state.accountId, m)));
-  for (const [key, unsub] of state.monthSubs) if (!needed.has(key)) { unsub(); state.monthSubs.delete(key); }
-  for (const key of needed) {
-    if (state.monthSubs.has(key)) continue;
-    const [accId, month] = key.split("|");
-    const unsub = state.db.doc(monthPath(accId, month)).onSnapshot((snap) => {
-      const d = snap.exists ? snap.data() : null;
-      state.months[key] = { exists: snap.exists, days: d?.days || {}, fetchedAt: Date.now() };
+  const needed = new Set([monthOf(ymd(start)), monthOf(ymd(end)), monthOf(todayKey())]);
+  for (const [m, unsub] of state.monthSubs) if (!needed.has(m)) { unsub(); state.monthSubs.delete(m); }
+  for (const m of needed) {
+    if (state.monthSubs.has(m)) continue;
+    const unsub = fb.onSnapshot(fb.doc(monthPath(m)), (snap) => {
+      state.months[m] = { days: snap.exists() ? snap.data().days || {} : {}, fetchedAt: Date.now() };
       renderAll(false);
-    }, () => {});
-    state.monthSubs.set(key, unsub);
+    }, (e) => console.error(e));
+    state.monthSubs.set(m, unsub);
   }
 }
 
-// Read a month that isn't subscribed (history for the assistant).
-async function getMonth(accId, month) {
-  const key = monthKey(accId, month);
-  const c = state.months[key];
-  if (c && (state.monthSubs.has(key) || Date.now() - (c.fetchedAt || 0) < 60000)) return c.days || {};
-  const snap = await state.db.doc(monthPath(accId, month)).get();
-  const days = snap.exists ? snap.data().days || {} : {};
-  state.months[key] = { exists: snap.exists, days, fetchedAt: Date.now() };
-  return days;
+function stopSubscriptions() {
+  state.profileUnsub?.(); state.profileUnsub = null;
+  for (const unsub of state.monthSubs.values()) unsub();
+  state.monthSubs.clear();
+  state.months = {};
+  state.profile = null;
 }
 
-function monthsBetween(start, end) {
-  const out = [];
-  const d = new Date(start.getFullYear(), start.getMonth(), 1);
-  while (d <= end && out.length < HISTORY_YEARS * 12 + 1) { out.push(ymd(d).slice(0, 7)); d.setMonth(d.getMonth() + 1); }
-  return out;
-}
-
+// History: read every month document in a range with one query.
 async function loadRange(startKey, endKey) {
-  const months = monthsBetween(parseYmd(startKey), parseYmd(endKey));
-  const result = [];
-  for (let i = 0; i < months.length; i += 6) {
-    const chunk = await Promise.all(months.slice(i, i + 6).map((m) => getMonth(state.accountId, m)));
-    for (const days of chunk) for (const [date, day] of Object.entries(days)) if (date >= startKey && date <= endKey) result.push([date, day]);
-  }
-  return result.sort((a, b) => a[0].localeCompare(b[0]));
+  const snap = await fb.monthsBetween(monthOf(startKey), monthOf(endKey));
+  const out = [];
+  snap.docs.forEach((d) => {
+    const days = d.data().days || {};
+    for (const [date, day] of Object.entries(days)) if (date >= startKey && date <= endKey) out.push([date, day]);
+  });
+  return out.sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 // ---------- Totals ----------
 function totalsOf(entries) {
   const t = Object.fromEntries(NUTRI.map((k) => [k, 0]));
-  for (const e of entries) for (const k of NUTRI) t[k] += num(e[k]) * num(e.qty || 1);
+  for (const e of entries) for (const k of NUTRI) t[k] += num(e[k]) * (num(e.qty) || 1);
   return t;
 }
 const dayTotals = (dateKey) => totalsOf(MEALS.flatMap((m) => dayData(dateKey)[m.id]));
@@ -291,10 +224,9 @@ const dayTotals = (dateKey) => totalsOf(MEALS.flatMap((m) => dayData(dateKey)[m.
 function weekStart(d) { const s = new Date(d); s.setDate(s.getDate() - s.getDay()); s.setHours(0, 0, 0, 0); return s; }
 
 function renderHeader() {
-  const a = account();
-  $("#accountInitial").textContent = a ? (a.name || "?").trim().charAt(0).toUpperCase() : "·";
+  const name = state.profile?.username || "";
+  $("#profileInitial").textContent = name ? name.charAt(0).toUpperCase() : "·";
   const sel = ymd(state.selectedDate);
-  const name = a?.name ? a.name.trim().split(/\s+/)[0] : "";
   $("#title").textContent = sel === todayKey()
     ? (name ? `Hi, ${name}` : "Food Log")
     : state.selectedDate.toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
@@ -332,6 +264,11 @@ function renderBars() {
   }).join("");
 }
 
+function entryMeta(e) {
+  const q = num(e.qty) || 1;
+  return `${q !== 1 ? `${r1(q)} × ` : ""}${esc(e.serving)} · P ${fmt(e.protein * q)}g · C ${fmt(e.carbs * q)}g · F ${fmt(e.fat * q)}g · S ${fmt(e.sugar * q)}g`;
+}
+
 function renderMeals() {
   const sel = ymd(state.selectedDate);
   const day = dayData(sel);
@@ -347,9 +284,8 @@ function renderMeals() {
       </div>
       ${entries.length ? `<ul class="entries">${entries.map((e) => `
         <li class="entry">
-          <div class="e-main"><div class="e-name">${esc(e.name)}</div>
-            <div class="e-meta">${num(e.qty) !== 1 ? `${r1(num(e.qty))} × ` : ""}${esc(e.serving)} · P ${fmt(e.protein * e.qty)}g · C ${fmt(e.carbs * e.qty)}g · F ${fmt(e.fat * e.qty)}g · S ${fmt(e.sugar * e.qty)}g</div></div>
-          <div class="e-kcal">${fmt(e.kcal * e.qty)}</div>
+          <div class="e-main"><div class="e-name">${esc(e.name)}</div><div class="e-meta">${entryMeta(e)}</div></div>
+          <div class="e-kcal">${fmt(e.kcal * (num(e.qty) || 1))}</div>
           <button class="e-del" data-del="${m.id}:${esc(e.id)}" aria-label="Remove ${esc(e.name)}">${ICON.trash}</button>
         </li>`).join("")}</ul>` : ""}
     </div>`;
@@ -370,8 +306,7 @@ function planNextMeal() {
   const sel = ymd(state.selectedDate);
   const day = dayData(sel);
   const order = MEALS.map((m) => m.id);
-  const fromIdx = sel === todayKey() ? order.indexOf(mealForNow()) : 0;
-  const rest = order.slice(fromIdx);
+  const rest = order.slice(sel === todayKey() ? order.indexOf(mealForNow()) : 0);
   const next = rest.find((id) => !day[id].length) || rest[rest.length - 1];
   const t = dayTotals(sel);
   const g = goals();
@@ -430,7 +365,6 @@ function recCard(f, idx, budget, next) {
 
 function renderRecs() {
   const el = $("#recs");
-  if (!account()) { el.innerHTML = ""; return; }
   const plan = planNextMeal();
   state.recPlan = plan;
   const { meals, drinks } = recommend(plan);
@@ -449,8 +383,7 @@ function renderRecs() {
     <h3>Picks for ${meal}</h3>
     <p class="why">${why}</p>
     ${meals.length ? `<div class="rec-row" aria-label="Meal picks">${meals.map((f, i) => recCard(f, i, plan.budget, plan.next)).join("")}</div>` : (plan.budget >= 150 ? '<p class="muted">Nothing in the food list fits that budget. Try fruit or a light snack.</p>' : "")}
-    ${drinks.length ? `<div class="sub-head">Low-sugar drinks</div><div class="rec-row" aria-label="Drink picks">${drinks.map((f, i) => recCard(f, meals.length + i, 0, plan.next)).join("")}</div>` : ""}
-    <button class="ask-pick" id="askPick">${ICON.chat}Ask the assistant for a pick</button>`;
+    ${drinks.length ? `<div class="sub-head">Low-sugar drinks</div><div class="rec-row" aria-label="Drink picks">${drinks.map((f, i) => recCard(f, meals.length + i, 0, plan.next)).join("")}</div>` : ""}`;
 }
 
 function renderSummary() {
@@ -470,6 +403,7 @@ function renderSummary() {
 }
 
 function renderAll(subs = true) {
+  if (!state.user) return;
   if (subs) ensureMonthSubs();
   renderHeader();
   renderWeek();
@@ -481,8 +415,10 @@ function renderAll(subs = true) {
 
 // ---------- Logging ----------
 function compactFood(f) {
-  return { id: f.id || "f" + uid(), name: String(f.name), serving: String(f.serving || "1 serving"), category: String(f.category || ""), source: String(f.source || ""),
+  const out = { id: f.id || "f" + uid(), name: String(f.name), serving: String(f.serving || "1 serving"), category: String(f.category || ""), source: String(f.source || ""),
     kcal: r0(num(f.kcal)), protein: r1(num(f.protein)), carbs: r1(num(f.carbs)), fat: r1(num(f.fat)), sugar: r1(num(f.sugar)), sodium: r0(num(f.sodium)) };
+  if (f.barcode) out.barcode = String(f.barcode);
+  return out;
 }
 
 function addEntry(mealId, food, qty) {
@@ -491,11 +427,8 @@ function addEntry(mealId, food, qty) {
   const f = compactFood(food);
   const entry = { ...f, id: uid(), qty: num(qty) || 1, at: new Date().toISOString() };
   writeDay(dateKey, { ...day, [mealId]: [...day[mealId], entry] }).catch(() => {});
-  const a = account();
-  if (a) {
-    const recents = [f, ...(a.recents || []).filter((r) => !(r.name === f.name && r.serving === f.serving))].slice(0, 25);
-    updateAccount({ recents }).catch(() => {});
-  }
+  const recents = [f, ...(state.profile?.recents || []).filter((r) => !(r.name === f.name && r.serving === f.serving))].slice(0, 25);
+  updateProfile({ recents }).catch(() => {});
 }
 
 function removeEntry(mealId, id) {
@@ -509,7 +442,6 @@ const sheet = { meal: mealForNow(), stack: [] };
 const sheetOpen = () => $("#sheet").classList.contains("open");
 
 function openSheet(mealId, view = "add", arg) {
-  if (view !== "accounts" && view !== "newAccount" && !account()) view = "accounts";
   sheet.meal = mealId || (ymd(state.selectedDate) === todayKey() ? mealForNow() : sheet.meal);
   sheet.stack = [];
   $("#scrim").classList.add("open");
@@ -518,11 +450,9 @@ function openSheet(mealId, view = "add", arg) {
 }
 
 function closeSheet() {
-  if (!account()) return; // an account must be chosen first
-  chat.ctl?.abort();
+  stopCamera();
   $("#scrim").classList.remove("open");
   $("#sheet").classList.remove("open");
-  $("#sheetFoot").hidden = true;
 }
 
 function renderMealTabs(visible) {
@@ -532,10 +462,9 @@ function renderMealTabs(visible) {
 }
 
 function show(view, arg, push = true) {
+  stopCamera();
   if (push) sheet.stack.push([view, arg]);
   $("#sheetBack").hidden = sheet.stack.length < 2;
-  $("#sheetClose").hidden = !account();
-  $("#sheetFoot").hidden = true;
   const body = $("#sheetBody");
   body.scrollTop = 0;
   VIEWS[view](body, arg);
@@ -544,12 +473,12 @@ function show(view, arg, push = true) {
 function back() {
   sheet.stack.pop();
   const [view, arg] = sheet.stack[sheet.stack.length - 1] || ["add"];
-  show(view, view === "scan" ? scanState : arg, false);
+  show(view, arg, false);
 }
 
 // ---------- Food search ----------
 let activeCategory = "All";
-const allFoods = () => [...(account()?.customFoods || []), ...window.SG_FOODS];
+const allFoods = () => [...(state.profile?.customFoods || []), ...window.SG_FOODS];
 
 function searchFoods(q, cat = activeCategory, limit = 60) {
   const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -587,76 +516,232 @@ function renderResults(q) {
   const query = q.trim();
   let html;
   if (!query && activeCategory === "All") {
-    pickList = (account()?.recents || []).slice(0, 12);
+    pickList = (state.profile?.recents || []).slice(0, 12);
     html = pickList.length
       ? `<div class="section-label">Recent</div><ul class="results">${pickList.map(resultItem).join("")}</ul>`
       : `<p class="muted">Search ${window.SG_FOODS.length} Singapore foods: hawker dishes, kopitiam drinks, fast food, bubble tea and supermarket brands.</p>`;
   } else {
     pickList = searchFoods(query);
     html = pickList.length ? `<ul class="results">${pickList.map(resultItem).join("")}</ul>` : `<p class="muted">No match in the food list.</p>`;
+    if (query.length >= 2) html += `<button class="link-btn" id="onlineBtn">Search packaged products online for “${esc(query)}”</button><div id="online"></div>`;
     html += `<button class="link-btn" data-act="custom-q">Can't find it? Enter it manually</button>`;
   }
   wrap.innerHTML = html;
+  $("#onlineBtn")?.addEventListener("click", () => searchOnline(query));
 }
 
-// ---------- Views ----------
-const VIEWS = {
-  accounts(body) {
-    $("#sheetTitle").textContent = account() ? "Accounts" : "Who's tracking?";
-    renderMealTabs(false);
-    const list = state.accounts;
-    body.innerHTML = `
-      ${!account() ? `<p class="note" style="margin-top:0">Pick your account, or create one. Everyone this tracker is shared with can have their own account.</p>` : ""}
-      <div class="acct-list">${list.map((a) => `
-        <button class="acct${a.id === state.accountId ? " cur" : ""}" data-account="${esc(a.id)}">
-          <span class="av">${esc((a.name || "?").charAt(0).toUpperCase())}</span>
-          <span class="r-main"><span class="a-name">${esc(a.name || "Unnamed")}</span>
-          <span class="a-meta" style="display:block">${fmt(num(a.goals?.kcal) || 1800)} kcal a day${state.myId && (a.linkedUsers || []).includes(state.myId) ? " · yours" : ""}</span></span>
-        </button>`).join("")}</div>
-      ${!list.length && state.accountsLoaded ? '<p class="muted">No accounts yet. Create the first one.</p>' : ""}
-      ${!state.accountsLoaded ? '<div class="spinner"></div>' : ""}
-      <button class="primary" data-act="new-account">Create an account</button>
-      ${account() ? `<button class="secondary" data-act="settings">Settings for ${esc(account().name)}</button>` : ""}`;
-  },
+// ---------- Open Food Facts (free packaged-product database) ----------
+function offToFood(p, code) {
+  const n = p.nutriments || {};
+  const hasServing = n["energy-kcal_serving"] != null && p.serving_size;
+  const pick = (k) => num(hasServing ? n[k + "_serving"] : n[k + "_100g"]);
+  let kcal = pick("energy-kcal");
+  if (!kcal) { const kj = pick("energy"); if (kj) kcal = kj / 4.184; }
+  const brand = p.brands ? ` (${p.brands.split(",")[0].trim()})` : "";
+  return compactFood({
+    id: "off" + (p.code || code || uid()), name: (p.product_name || p.product_name_en || "Unnamed product") + brand,
+    serving: hasServing ? p.serving_size : "100g / 100ml", kcal, protein: pick("proteins"), carbs: pick("carbohydrates"),
+    fat: pick("fat"), sugar: pick("sugars"), sodium: pick("sodium") * 1000, category: "Packaged", source: "Open Food Facts",
+    barcode: p.code || code,
+  });
+}
 
-  newAccount(body) {
-    $("#sheetTitle").textContent = "New account";
-    renderMealTabs(false);
-    body.innerHTML = `
-      <div class="form">
-        <div class="field full"><label for="naName">Name</label><input id="naName" type="text" autocomplete="off" placeholder="e.g. Grace"></div>
-        <div class="field full"><label for="naKcal">Daily calorie goal (kcal)</label><input id="naKcal" type="number" inputmode="numeric" min="800" max="6000" value="1800"></div>
-      </div>
-      <p class="note">Protein, carbs and fat goals are set from the calorie goal (25%, 50% and 25% of calories). Sugar starts at 40g and sodium at 2,000mg. You can change all of them in Settings.</p>
-      ${state.myId ? `<label class="check"><input type="checkbox" id="naLink" checked> This is me. Open this account automatically when I use the tracker on any phone or computer.</label>` : ""}
-      <button class="primary" id="naCreate">Create account</button>`;
-    $("#naCreate", body).addEventListener("click", async () => {
-      const name = $("#naName", body).value.trim();
-      if (!name) return toast("Enter a name");
-      const kcal = Math.min(6000, Math.max(800, num($("#naKcal", body).value) || 1800));
-      const link = $("#naLink", body)?.checked;
-      const id = "a" + uid();
-      const data = { name, goals: goalsFor(kcal), linkedUsers: link && state.myId ? [state.myId] : [], recents: [], customFoods: [], createdAt: new Date().toISOString() };
-      $("#naCreate", body).disabled = true;
-      try {
-        await queueWrite(`accounts/${id}`, () => state.db.doc(`accounts/${id}`).set(data));
-        if (!state.accounts.find((a) => a.id === id)) state.accounts.push({ id, ...data });
-        selectAccount(id);
-        closeSheet();
-        toast(`Welcome, ${name}`);
-      } catch { $("#naCreate", body).disabled = false; }
+const OFF_FIELDS = "code,product_name,product_name_en,brands,serving_size,nutriments";
+async function lookupBarcode(code) {
+  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${OFF_FIELDS}`);
+  if (!res.ok && res.status !== 404) throw new Error("lookup failed");
+  const data = await res.json();
+  if (data.status !== 1 || !data.product) return null;
+  const f = offToFood(data.product, code);
+  return f.kcal > 0 ? f : null;
+}
+
+async function searchOnline(query) {
+  const box = $("#online");
+  if (!box) return;
+  box.innerHTML = '<div class="spinner"></div>';
+  const base = `https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=25&fields=${OFF_FIELDS}&search_terms=${encodeURIComponent(query)}`;
+  try {
+    let products = (await (await fetch(base + "&tagtype_0=countries&tag_contains_0=contains&tag_0=singapore")).json()).products || [];
+    if (products.length < 5) products = products.concat((await (await fetch(base)).json()).products || []);
+    const seen = new Set();
+    const foods = products.map((p) => offToFood(p)).filter((f) => f.kcal > 0 && !seen.has(f.id) && seen.add(f.id));
+    if (!$("#online")) return;
+    if (!foods.length) { box.innerHTML = '<p class="muted">No online matches.</p>'; return; }
+    const offset = pickList.length;
+    pickList = pickList.concat(foods);
+    box.innerHTML = `<div class="section-label">Online · Open Food Facts</div><ul class="results">${foods.map((f, i) => resultItem(f, offset + i)).join("")}</ul>`;
+  } catch {
+    if ($("#online")) box.innerHTML = '<p class="muted">Couldn\'t reach the online database. Check your connection.</p>';
+  }
+}
+
+// ---------- Barcode scanner (runs on the phone; images are never stored or uploaded) ----------
+const cam = { stream: null, controls: null, raf: 0, done: false };
+let zxingReader = null;
+
+async function getZxing() {
+  if (!zxingReader) {
+    const { BrowserMultiFormatReader } = await import("./vendor/zxing-browser.js");
+    zxingReader = new BrowserMultiFormatReader();
+  }
+  return zxingReader;
+}
+
+function stopCamera() {
+  cancelAnimationFrame(cam.raf);
+  cam.raf = 0;
+  try { cam.controls?.stop(); } catch { /* already stopped */ }
+  cam.controls = null;
+  cam.stream?.getTracks().forEach((t) => t.stop());
+  cam.stream = null;
+  const v = $("#scanVideo");
+  if (v) v.srcObject = null;
+}
+
+async function startCamera(video, onCode) {
+  cam.done = false;
+  const found = (code) => { if (cam.done || !code) return; cam.done = true; stopCamera(); onCode(code); };
+  const native = "BarcodeDetector" in window && (await window.BarcodeDetector.getSupportedFormats?.().catch(() => []) || []).includes("ean_13");
+  if (native) {
+    cam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+    video.srcObject = cam.stream;
+    await video.play();
+    const det = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
+    const loop = async () => {
+      if (cam.done || !cam.stream) return;
+      try { const codes = await det.detect(video); if (codes.length) return found(codes[0].rawValue); } catch { /* keep trying */ }
+      cam.raf = requestAnimationFrame(loop);
+    };
+    cam.raf = requestAnimationFrame(loop);
+  } else {
+    const reader = await getZxing();
+    cam.controls = await reader.decodeFromConstraints({ video: { facingMode: { ideal: "environment" } }, audio: false }, video, (result) => {
+      if (result) found(result.getText());
     });
-  },
+  }
+}
 
+async function decodePhoto(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    if ("BarcodeDetector" in window) {
+      try {
+        const bmp = await createImageBitmap(file);
+        const codes = await new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] }).detect(bmp);
+        bmp.close?.();
+        if (codes.length) return codes[0].rawValue;
+      } catch { /* fall back to ZXing */ }
+    }
+    const reader = await getZxing();
+    const result = await reader.decodeFromImageUrl(url);
+    return result?.getText() || null;
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url); // the photo is discarded straight away
+  }
+}
+
+async function handleCode(code) {
+  code = String(code).replace(/\D/g, "");
+  if (code.length < 6) { toast("That doesn't look like a barcode number"); return; }
+  const mine = (state.profile?.customFoods || []).find((f) => f.barcode === code);
+  if (mine) { show("detail", mine); return; }
+  const body = $("#sheetBody");
+  body.innerHTML = `<div class="spinner"></div><p class="scan-status">Barcode ${esc(code)} found. Looking it up…</p>`;
+  try {
+    const food = await lookupBarcode(code);
+    if (food) show("detail", food);
+    else show("notFound", code);
+  } catch {
+    show("notFound", { code, offline: true });
+  }
+}
+
+// ---------- History ----------
+const hist = { range: "30", query: "" };
+const RANGES = [["7", "7 days"], ["30", "30 days"], ["month", "This month"], ["year", "This year"], ["all", "All time"]];
+
+function rangeDates(r) {
+  const end = new Date(); const start = new Date();
+  if (r === "month") start.setDate(1);
+  else if (r === "year") { start.setMonth(0); start.setDate(1); }
+  else if (r === "all") start.setFullYear(start.getFullYear() - HISTORY_YEARS);
+  else start.setDate(start.getDate() - (Number(r) - 1));
+  return [ymd(start), ymd(end)];
+}
+
+async function runHistory() {
+  const out = $("#histOut");
+  if (!out) return;
+  out.innerHTML = '<div class="spinner"></div>';
+  const [start, end] = rangeDates(hist.range);
+  let days;
+  try { days = await loadRange(start, end); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your history. Check your connection.</p>'; return; }
+  if (!$("#histOut")) return;
+  const logged = days.filter(([, d]) => MEALS.some((m) => (d[m.id] || []).length));
+  const q = hist.query.trim().toLowerCase();
+  if (q) {
+    const words = q.split(/\s+/);
+    const hits = [];
+    for (const [date, d] of logged) for (const m of MEALS) for (const e of d[m.id] || []) {
+      const name = String(e.name).toLowerCase();
+      if (words.every((w) => name.includes(w))) hits.push({ date, meal: m.id, e });
+    }
+    const t = totalsOf(hits.map((h) => h.e));
+    const byDay = new Map();
+    for (const h of hits) { if (!byDay.has(h.date)) byDay.set(h.date, []); byDay.get(h.date).push(h); }
+    out.innerHTML = `
+      <div class="stat-row">
+        <div class="stat"><div class="k">Times</div><div class="v">${hits.length}</div></div>
+        <div class="stat"><div class="k">Calories</div><div class="v">${fmt(t.kcal)} <small>kcal</small></div></div>
+        <div class="stat"><div class="k">Sugar</div><div class="v">${fmt(t.sugar)} <small>g</small></div></div>
+      </div>
+      ${hits.length ? [...byDay.entries()].reverse().map(([date, list]) => `
+        <div class="hist-day"><div class="hd">${esc(prettyDate(date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }))}<span>${fmt(totalsOf(list.map((h) => h.e)).kcal)} kcal</span></div>
+          <ul>${list.map((h) => `<li><span>${esc(mealName(h.meal))}: ${esc(h.e.name)}${num(h.e.qty) !== 1 ? ` × ${r1(num(h.e.qty))}` : ""}</span><span>${fmt(h.e.kcal * (num(h.e.qty) || 1))}</span></li>`).join("")}</ul></div>`).join("")
+        : `<p class="muted">No foods matching “${esc(hist.query)}” in this period.</p>`}`;
+    return;
+  }
+  if (!logged.length) { out.innerHTML = '<p class="muted">Nothing logged in this period yet.</p>'; return; }
+  const totals = logged.map(([date, d]) => [date, totalsOf(MEALS.flatMap((m) => d[m.id] || []))]);
+  const avg = (k) => totals.reduce((s, [, t]) => s + t[k], 0) / totals.length;
+  const g = goals();
+  const counts = new Map();
+  for (const [, d] of logged) for (const m of MEALS) for (const e of d[m.id] || []) counts.set(e.name, (counts.get(e.name) || 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const showBars = totals.length > 1 && totals.length <= 92;
+  const maxK = Math.max(g.kcal, ...totals.map(([, t]) => t.kcal));
+  out.innerHTML = `
+    <div class="stat-row">
+      <div class="stat"><div class="k">Days logged</div><div class="v">${totals.length}</div></div>
+      <div class="stat"><div class="k">Avg calories</div><div class="v">${fmt(avg("kcal"))}</div></div>
+      <div class="stat"><div class="k">Avg sugar</div><div class="v">${fmt(avg("sugar"))}<small>g</small></div></div>
+    </div>
+    ${showBars ? `<div class="daybars" aria-label="Calories per logged day">${totals.map(([date, t]) => `<i class="${t.kcal > g.kcal ? "over" : ""}" style="height:${Math.max(3, (t.kcal / maxK) * 100)}%" title="${esc(prettyDate(date))}: ${fmt(t.kcal)} kcal"></i>`).join("")}</div>
+      <p class="note">Each bar is a logged day. Red bars went over your ${fmt(g.kcal)} kcal goal.</p>` : ""}
+    <div class="section-label">Most eaten</div>
+    <ul class="top-foods">${top.map(([name, n]) => `<li><span>${esc(name)}</span><span>${n}×</span></li>`).join("")}</ul>
+    <div class="section-label">Day by day</div>
+    ${totals.slice().reverse().slice(0, 60).map(([date, t]) => {
+      const d = logged.find(([k]) => k === date)[1];
+      return `<div class="hist-day"><div class="hd">${esc(prettyDate(date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }))}<span>${fmt(t.kcal)} kcal · S ${fmt(t.sugar)}g</span></div>
+        <ul>${MEALS.filter((m) => (d[m.id] || []).length).map((m) => `<li><span>${esc(m.name)}: ${esc(d[m.id].map((e) => e.name).join(", "))}</span><span>${fmt(totalsOf(d[m.id]).kcal)}</span></li>`).join("")}</ul></div>`;
+    }).join("")}`;
+}
+
+// ---------- Views (bottom sheet) ----------
+const VIEWS = {
   add(body) {
     $("#sheetTitle").textContent = "Log a meal";
     renderMealTabs(true);
     const cats = ["All", ...new Set(window.SG_FOODS.map((f) => f.category))];
-    if ((account()?.customFoods || []).length) cats.splice(1, 0, "My foods");
+    if ((state.profile?.customFoods || []).length) cats.splice(1, 0, "My foods");
     if (!cats.includes(activeCategory)) activeCategory = "All";
     body.innerHTML = `
       <div class="modes">
-        <button class="mode" data-act="scan">${ICON.camera}<b>Photo scan</b><span>Snap your food or its nutrition label</span></button>
+        <button class="mode" data-act="scan">${ICON.barcode}<b>Scan barcode</b><span>Packaged food and drinks</span></button>
         <button class="mode" data-act="custom">${ICON.pen}<b>Manual entry</b><span>Type in calories and macros</span></button>
       </div>
       <div class="search">${ICON.search}<input id="q" type="search" placeholder="Search SG food, drinks, brands" autocomplete="off" enterkeyhint="search" aria-label="Search foods"></div>
@@ -674,6 +759,44 @@ const VIEWS = {
       update();
     });
     update();
+  },
+
+  scan(body) {
+    $("#sheetTitle").textContent = "Scan a barcode";
+    renderMealTabs(true);
+    body.innerHTML = `
+      <div class="scanner"><video id="scanVideo" playsinline muted></video><div class="frame"></div></div>
+      <p class="scan-status" id="scanStatus">Starting the camera…</p>
+      <div class="row2">
+        <button class="secondary" data-act="photo">Take a photo instead</button>
+        <button class="secondary" data-act="custom">Enter manually</button>
+      </div>
+      <form class="barcode-form" id="codeForm"><input id="codeInput" inputmode="numeric" autocomplete="off" placeholder="Or type the barcode number" aria-label="Barcode number"><button type="submit">Look up</button></form>
+      <p class="note">The camera picture stays on your phone and is never saved. Only the barcode number is sent to Open Food Facts to look up the product.</p>`;
+    $("#codeForm", body).addEventListener("submit", (e) => { e.preventDefault(); stopCamera(); handleCode($("#codeInput", body).value); });
+    if (!navigator.mediaDevices?.getUserMedia) {
+      $("#scanStatus", body).textContent = "This browser can't open the camera here. Take a photo of the barcode or type its number.";
+      return;
+    }
+    startCamera($("#scanVideo", body), handleCode).then(() => {
+      if ($("#scanStatus")) $("#scanStatus").textContent = "Point the camera at the barcode.";
+    }).catch((e) => {
+      console.error(e);
+      if ($("#scanStatus")) $("#scanStatus").textContent = e?.name === "NotAllowedError"
+        ? "Camera access is blocked. Allow camera access for this site in your browser settings, or take a photo instead."
+        : "Couldn't start the camera. Take a photo of the barcode or type its number.";
+    });
+  },
+
+  notFound(body, arg) {
+    const code = typeof arg === "string" ? arg : arg.code;
+    $("#sheetTitle").textContent = "Product not found";
+    renderMealTabs(true);
+    body.innerHTML = `
+      <p class="scan-status">${arg.offline ? "Couldn't reach the product database. Check your connection." : `Barcode <b>${esc(code)}</b> isn't in the free product database yet.`}</p>
+      <p class="note" style="text-align:center">Enter it once from the nutrition label and it's saved to My foods. Next time you scan this barcode it fills in by itself.</p>
+      <button class="primary" data-act="custom-barcode" data-code="${esc(code)}">Enter it from the label</button>
+      <button class="secondary" data-act="scan">Scan again</button>`;
   },
 
   detail(body, food) {
@@ -695,7 +818,7 @@ const VIEWS = {
         </div>
         <button class="primary" id="addBtn">Add to ${mealName(sheet.meal)}</button>
       </div>
-      ${food.estimate ? '<p class="note">These numbers are an AI estimate from your photo. Change the servings if your portion was bigger or smaller.</p>' : ""}`;
+      ${food.source === "Open Food Facts" ? '<p class="note">From Open Food Facts, a free database run by volunteers. If the numbers look wrong, check the label and enter it manually instead.</p>' : ""}`;
     const qty = $("#qty", body);
     const paint = () => {
       const q = num(qty.value);
@@ -730,18 +853,19 @@ const VIEWS = {
         ${f("cSugar", "Sugar (g)", prefill.sugar)}
         ${f("cSodium", "Sodium (mg)", prefill.sodium)}
       </div>
-      <label class="check"><input type="checkbox" id="cSave" checked> Save to My foods for next time</label>
+      ${prefill.barcode ? `<p class="note">Barcode ${esc(prefill.barcode)} will be linked to this food.</p>` : ""}
+      <label class="check"><input type="checkbox" id="cSave" checked${prefill.barcode ? " disabled" : ""}> Save to My foods for next time</label>
       <button class="primary" id="cAdd">Add to ${mealName(sheet.meal)}</button>`;
     $("#cAdd", body).addEventListener("click", () => {
       const v = (id) => $("#" + id, body).value.trim();
       const name = v("cName");
       if (!name) return toast("Give the food a name");
       if (v("cKcal") === "") return toast("Enter the calories");
-      const food = compactFood({ name, serving: v("cServing") || "1 serving", category: "My foods", source: "My foods",
+      const food = compactFood({ name, serving: v("cServing") || "1 serving", category: "My foods", source: "My foods", barcode: prefill.barcode,
         kcal: v("cKcal"), protein: v("cProtein"), carbs: v("cCarbs"), fat: v("cFat"), sugar: v("cSugar"), sodium: v("cSodium") });
-      if ($("#cSave", body).checked && account()) {
-        const customFoods = [food, ...(account().customFoods || []).filter((c) => c.name.toLowerCase() !== name.toLowerCase())].slice(0, 300);
-        updateAccount({ customFoods }).catch(() => {});
+      if ($("#cSave", body).checked) {
+        const customFoods = [food, ...(state.profile?.customFoods || []).filter((c) => c.name.toLowerCase() !== name.toLowerCase() && (!food.barcode || c.barcode !== food.barcode))].slice(0, 300);
+        updateProfile({ customFoods }).catch(() => {});
       }
       addEntry(sheet.meal, food, 1);
       closeSheet();
@@ -749,48 +873,38 @@ const VIEWS = {
     });
   },
 
-  scan(body, st) {
-    $("#sheetTitle").textContent = "Photo scan";
-    renderMealTabs(true);
-    let html = st.img ? `<img class="scan-preview" src="${st.img}" alt="Your photo">` : "";
-    if (st.status === "working") {
-      html += `<div class="spinner"></div><p class="muted">${esc(st.msg || "Looking at your photo…")}</p>`;
-    } else if (st.status === "error") {
-      html += `<p class="muted">${esc(st.error)}</p>${state.sampleLimits?.images ? '<button class="primary" data-act="scan">Try another photo</button>' : ""}<button class="secondary" data-act="back-search">Search instead</button>`;
-    } else if (st.status === "done") {
-      pickList = st.items;
-      html += `<div class="section-label">${st.items.length ? "Found in your photo" : "Nothing recognised"}</div>`;
-      html += st.items.map((f, i) => `
-        <label class="ai-item"><input type="checkbox" data-ai="${i}" checked>
-          <div class="r-main"><div class="r-name">${esc(f.name)}</div>
-          <div class="r-meta">${esc(f.serving)} · P ${fmt(f.protein)}g · C ${fmt(f.carbs)}g · F ${fmt(f.fat)}g · S ${fmt(f.sugar)}g${f.confidence ? ` · ${esc(f.confidence)} confidence` : ""}</div></div>
-          <div class="r-kcal">${fmt(f.kcal)} kcal</div></label>`).join("");
-      if (st.note) html += `<p class="note">${esc(st.note)}</p>`;
-      if (st.items.length) html += `<button class="primary" id="aiAdd">Add selected to ${mealName(sheet.meal)}</button><button class="secondary" data-act="ai-edit">Edit the first item</button>`;
-      html += `<button class="secondary" data-act="scan">Retake photo</button>`;
-    }
-    body.innerHTML = html;
-    $("#aiAdd", body)?.addEventListener("click", () => {
-      const chosen = [...body.querySelectorAll("[data-ai]")].filter((c) => c.checked).map((c) => st.items[+c.dataset.ai]);
-      if (!chosen.length) return toast("Pick at least one item");
-      chosen.forEach((f) => addEntry(sheet.meal, f, 1));
-      closeSheet();
-      toast(`Added ${chosen.length} item${chosen.length > 1 ? "s" : ""} to ${mealName(sheet.meal)}`);
+  history(body) {
+    $("#sheetTitle").textContent = "History";
+    renderMealTabs(false);
+    body.innerHTML = `
+      <form class="search" id="histForm">${ICON.search}<input id="histQ" type="search" placeholder="Search a food, e.g. bubble tea" autocomplete="off" enterkeyhint="search" value="${esc(hist.query)}" aria-label="Search your history"></form>
+      <div class="chips" id="histRange">${RANGES.map(([k, label]) => `<button data-range="${k}" class="${k === hist.range ? "on" : ""}">${label}</button>`).join("")}</div>
+      <div id="histOut"></div>`;
+    const input = $("#histQ", body);
+    let t;
+    input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { hist.query = input.value; runHistory(); }, 300); });
+    $("#histForm", body).addEventListener("submit", (e) => { e.preventDefault(); input.blur(); hist.query = input.value; runHistory(); });
+    $("#histRange", body).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-range]");
+      if (!b) return;
+      hist.range = b.dataset.range;
+      body.querySelectorAll("#histRange button").forEach((x) => x.classList.toggle("on", x === b));
+      runHistory();
     });
+    runHistory();
   },
 
-  settings(body) {
-    const a = account();
-    $("#sheetTitle").textContent = `Settings for ${a.name}`;
+  profile(body) {
+    const p = state.profile || {};
+    $("#sheetTitle").textContent = "Profile";
     renderMealTabs(false);
     const g = goals();
-    const f = (id, label, val, cls = "", text = false) => `<div class="field ${cls}"><label for="${id}">${label}</label><input id="${id}" ${text ? 'type="text"' : 'type="number" inputmode="decimal" min="0"'} value="${esc(val)}"></div>`;
-    const linked = state.myId && (a.linkedUsers || []).includes(state.myId);
+    const f = (id, label, val) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" inputmode="decimal" min="0" value="${esc(val)}"></div>`;
     body.innerHTML = `
-      <button class="secondary" style="margin-top:0" data-act="accounts">Switch or add account</button>
-      <div class="section-label">Account</div>
-      <div class="form">${f("sName", "Name", a.name, "full", true)}</div>
-      ${state.myId ? `<label class="check"><input type="checkbox" id="sLink"${linked ? " checked" : ""}> Open this account automatically when I use the tracker on any phone or computer</label>` : ""}
+      <div class="kv">
+        <div><span>Username</span><b>${esc(p.username || "")}</b></div>
+        <div><span>Email</span><b>${esc(state.user?.email || p.email || "")}</b></div>
+      </div>
       <div class="section-label">Daily goals</div>
       <div class="form">
         ${f("gKcal", "Calories (kcal)", g.kcal)}
@@ -800,50 +914,37 @@ const VIEWS = {
         ${f("gSugar", "Sugar (g)", g.sugar)}
         ${f("gSodium", "Sodium (mg)", g.sodium)}
       </div>
+      <button class="secondary" id="autoGoals">Set protein, carbs and fat from my calorie goal</button>
       <p class="note">HPB's guide for adults is under about 40–50g of added sugar and under 2,000mg of sodium a day.</p>
-      <button class="primary" id="saveSettings">Save</button>
+      <button class="primary" id="saveGoals">Save goals</button>
+      <div class="section-label">Password</div>
+      <button class="secondary" id="resetPw">Email me a link to change my password</button>
       <div class="section-label">This day</div>
       <button class="secondary danger" id="clearDay">Clear everything logged on ${state.selectedDate.toLocaleDateString("en-SG", { day: "numeric", month: "short" })}</button>
-      <div class="section-label">Delete account</div>
-      <button class="secondary danger" id="delAcct">Delete ${esc(a.name)}'s account and history</button>
-      <p class="note">${window.SG_FOODS.length} Singapore foods built in. Values are typical portions from HPB and brand data; hawker portions vary by stall. ${state.mode === "local" ? "<b>This copy is saved on this device only.</b> Open the tracker inside Claude to sync between devices." : "Your log is saved online and syncs to every device you open the tracker on."}</p>`;
-    $("#saveSettings", body).addEventListener("click", async () => {
+      <button class="secondary" id="signOutBtn" style="margin-top:22px">Sign out</button>
+      <p class="note">${window.SG_FOODS.length} Singapore foods built in. Values are typical portions from HPB and brand data; hawker portions vary by stall.</p>`;
+    $("#autoGoals", body).addEventListener("click", () => {
+      const a = goalsFor(num($("#gKcal", body).value) || 1800);
+      $("#gProtein", body).value = a.protein; $("#gCarbs", body).value = a.carbs; $("#gFat", body).value = a.fat;
+    });
+    $("#saveGoals", body).addEventListener("click", async () => {
       const v = (id) => num($("#" + id, body).value);
-      const name = $("#sName", body).value.trim() || a.name;
-      const patch = { name, goals: { kcal: v("gKcal") || 1800, protein: v("gProtein"), carbs: v("gCarbs"), fat: v("gFat"), sugar: v("gSugar"), sodium: v("gSodium") } };
-      const link = $("#sLink", body);
-      if (link) {
-        const others = (a.linkedUsers || []).filter((x) => x !== state.myId);
-        patch.linkedUsers = link.checked ? [...others, state.myId] : others;
-      }
-      try { await updateAccount(patch); renderAll(); closeSheet(); toast("Saved"); } catch { /* toast already shown */ }
+      const goalsNew = { kcal: v("gKcal") || 1800, protein: v("gProtein"), carbs: v("gCarbs"), fat: v("gFat"), sugar: v("gSugar"), sodium: v("gSodium") };
+      try { await updateProfile({ goals: goalsNew }); renderAll(); closeSheet(); toast("Goals saved"); } catch { /* toast shown */ }
+    });
+    $("#resetPw", body).addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      try { await sendReset(state.user.email); toast(`Link sent to ${state.user.email}`); } catch { toast("Couldn't send the email. Try again later."); e.target.disabled = false; }
     });
     armButton($("#clearDay", body), "Tap again to clear this day", async () => {
-      const empty = Object.fromEntries(MEALS.map((m) => [m.id, []]));
-      await writeDay(ymd(state.selectedDate), empty).catch(() => {});
+      await writeDay(ymd(state.selectedDate), Object.fromEntries(MEALS.map((m) => [m.id, []]))).catch(() => {});
       closeSheet(); toast("Day cleared");
     });
-    armButton($("#delAcct", body), `Tap again to delete ${a.name} for good`, async () => {
-      try {
-        for (const unsub of state.monthSubs.values()) unsub();
-        state.monthSubs.clear();
-        const months = await state.db.collection(`accounts/${a.id}/months`).get();
-        for (const d of months.docs) await state.db.doc(`accounts/${a.id}/months/${d.id}`).delete();
-        await state.db.doc(`accounts/${a.id}`).delete();
-        state.accounts = state.accounts.filter((x) => x.id !== a.id);
-        state.accountId = null;
-        lsSet("gct.lastAccount", null);
-        renderAll();
-        openSheet(null, "accounts");
-        toast("Account deleted");
-      } catch { toast("Couldn't delete the account. Try again."); }
-    });
+    $("#signOutBtn", body).addEventListener("click", async () => { closeSheet(); await fb.signOut(fb.auth); });
   },
-
-  chat(body, prefill) { renderChat(body, prefill); },
 };
 
-// Two-step confirm (the viewer can't show confirm() dialogs).
+// Two-step confirm for destructive buttons.
 function armButton(btn, armedText, action) {
   const label = btn.textContent;
   let timer;
@@ -859,329 +960,218 @@ function armButton(btn, armedText, action) {
   });
 }
 
-// ---------- Photo scan (Claude reads the photo) ----------
-let scanState = {};
-function setScan(patch) {
-  scanState = { ...scanState, ...patch };
-  const top = sheet.stack[sheet.stack.length - 1];
-  if (top && top[0] === "scan") show("scan", scanState, false);
+// ---------- Sign in / sign up / forgot password ----------
+const AUTH_ERRORS = {
+  "auth/invalid-credential": "That username or password is wrong.",
+  "auth/wrong-password": "That username or password is wrong.",
+  "auth/user-not-found": "That username or password is wrong.",
+  "auth/invalid-email": "That email address doesn't look right.",
+  "auth/email-already-in-use": "An account already uses that email. Sign in instead, or reset the password.",
+  "auth/weak-password": "Use a password of at least 6 characters.",
+  "auth/too-many-requests": "Too many tries. Wait a few minutes, or reset your password.",
+  "auth/network-request-failed": "No internet connection. Check your connection and try again.",
+  "auth/operation-not-allowed": "Email sign-in isn't turned on yet in Firebase. See the setup steps in the README.",
+};
+const authError = (e) => AUTH_ERRORS[e?.code] || e?.message || "Something went wrong. Try again.";
+
+async function resolveEmail(login) {
+  const v = login.trim();
+  if (v.includes("@")) return v;
+  const snap = await fb.getDoc(fb.doc(`usernames/${v.toLowerCase()}`));
+  return snap.exists() ? snap.data().email : null;
 }
 
-function startScan() {
-  if (!state.sample || !state.sampleLimits?.images) {
-    if (!sheetOpen()) openSheet(sheet.meal, "add");
-    scanState = { status: "error", error: state.sample
-      ? "Photo recognition isn't available on this device. Search for the food or enter it manually."
-      : "Photo recognition works when the tracker is opened inside Claude. Search for the food or enter it manually." };
-    show("scan", scanState);
-    return;
-  }
-  const input = $("#cameraInput");
-  input.value = "";
-  input.click();
+async function sendReset(email) {
+  const url = location.href.split("#")[0].split("?")[0];
+  try { await fb.sendReset(fb.auth, email, { url }); }
+  catch (e) { if (String(e?.code).includes("continue-uri") || e?.code === "auth/unauthorized-domain") await fb.sendReset(fb.auth, email); else throw e; }
 }
 
-const SCAN_PROMPT = `You are a nutrition assistant for someone living in Singapore.
-Identify each distinct food or drink in this photo and estimate the nutrition for the portion actually shown.
-Use Singapore names where they apply (e.g. "Chicken Rice (roasted)", "Kopi C", "Char Kway Teow") and typical Singapore hawker or retail portions, consistent with Health Promotion Board food composition data.
-If the photo shows a packaged product or a nutrition label, read the label values for one serving.
-Reply with only a JSON object in this shape:
-{"items":[{"name":"Chicken Rice (roasted)","serving":"1 plate (380g)","kcal":680,"protein":30,"carbs":75,"fat":28,"sugar":2,"sodium":1300,"confidence":"high"}],"note":"one short sentence on anything to double-check, or an empty string"}
-kcal in kcal, sodium in mg, everything else in grams; confidence is high, medium or low.
-If there is no food or drink in the photo, return an empty items array and say so in note.`;
-
-async function handlePhoto(file) {
-  if (!file) return;
-  if (!sheetOpen()) openSheet(sheet.meal, "add");
-  scanState = { status: "working", img: URL.createObjectURL(file), msg: "Recognising your food…" };
-  show("scan", scanState);
-  try {
-    const res = await state.sample.json(SCAN_PROMPT, { images: [file], cache: false });
-    const items = (Array.isArray(res?.items) ? res.items : []).filter((it) => it && it.name).map((it) => ({
-      ...compactFood({ ...it, category: "Photo scan", source: "AI estimate" }), confidence: String(it.confidence || ""), estimate: true,
-    }));
-    setScan({ status: "done", items, note: typeof res?.note === "string" ? res.note : "" });
-  } catch (e) {
-    const msg = {
-      not_granted: "Photo recognition needs your permission to use Claude. Search for the food or enter it manually.",
-      rate_limited: "Too many requests right now. Try again in a minute.",
-      image_rejected: "That photo couldn't be read. Try a clearer JPEG or PNG photo.",
-      refused: "Claude couldn't analyse this photo. Try another one.",
-      invalid_json: "The result came back in the wrong format. Try again.",
-    }[e?.code] || "Something went wrong. Try again, or search for the food instead.";
-    setScan({ status: "error", error: msg });
-  }
-}
-
-// ---------- Assistant (chat) ----------
-const chat = { turns: [], ctl: null, busy: false, status: "" };
-
-function md(text) {
-  const lines = esc(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split("\n");
-  let html = "", list = false;
-  for (const raw of lines) {
-    const line = raw.trim();
-    const bullet = line.match(/^[-*•]\s+(.*)/);
-    if (bullet) { if (!list) { html += "<ul>"; list = true; } html += `<li>${bullet[1]}</li>`; continue; }
-    if (list) { html += "</ul>"; list = false; }
-    if (line) html += `<p>${line.replace(/^#+\s*/, "")}</p>`;
-  }
-  return html + (list ? "</ul>" : "");
-}
-
-function renderChat(body, prefill) {
-  $("#sheetTitle").textContent = "Ask about your food";
-  renderMealTabs(false);
-  const a = account();
-  const msgs = chat.turns.map((t) => `<div class="msg ${t.role === "user" ? "user" : "bot"}">${t.role === "user" ? esc(t.content) : md(t.content)}</div>`).join("");
-  const suggestions = ["What did I eat this past week?", "How many bubble teas have I had this month?", "What should I eat for dinner?", "Which day this month had the most sugar?"];
-  body.innerHTML = `<div class="chat" id="chatLog">
-    ${!chat.turns.length ? `<div class="msg bot"><p>Hi ${esc(a?.name || "")}! I can look through your food log, from today back to 10 years ago, and suggest what to eat next. Try one of these:</p></div>
-      <div class="suggest">${suggestions.map((s) => `<button data-suggest="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : msgs}
-    ${chat.busy ? `<div class="msg bot" id="liveMsg"><p>${esc(chat.status || "Thinking…")}</p></div>` : ""}
-  </div>
-  ${!state.sample ? '<p class="note">The assistant works when the tracker is opened inside Claude.</p>' : ""}`;
-  const foot = $("#sheetFoot");
-  foot.hidden = false;
-  foot.innerHTML = `<form class="chat-input" id="chatForm">
-    <textarea id="chatText" rows="1" placeholder="Ask about what you've eaten" aria-label="Message">${esc(prefill || "")}</textarea>
-    <button class="send${chat.busy ? " stop" : ""}" id="chatSend" type="${chat.busy ? "button" : "submit"}" aria-label="${chat.busy ? "Stop" : "Send"}">${chat.busy ? ICON.stop : ICON.send}</button>
-  </form>`;
-  const ta = $("#chatText");
-  ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#chatForm").requestSubmit(); } });
-  ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(120, ta.scrollHeight) + "px"; });
-  $("#chatForm").addEventListener("submit", (e) => { e.preventDefault(); sendChat(ta.value); });
-  $("#chatSend").addEventListener("click", () => { if (chat.busy) chat.ctl?.abort(); });
-  body.scrollTop = body.scrollHeight;
-}
-
-function refreshChat() {
-  const top = sheet.stack[sheet.stack.length - 1];
-  if (sheetOpen() && top && top[0] === "chat") renderChat($("#sheetBody"), $("#chatText")?.value || "");
-}
-
-function setLive(text) {
-  const live = $("#liveMsg");
-  if (live) { live.innerHTML = md(text); $("#sheetBody").scrollTop = $("#sheetBody").scrollHeight; }
-}
-
-function entryRow(date, meal, e) {
-  const q = num(e.qty) || 1;
-  return { date, meal, food: e.name, servings: r1(q), kcal: r0(num(e.kcal) * q), protein: r1(num(e.protein) * q), carbs: r1(num(e.carbs) * q),
-    fat: r1(num(e.fat) * q), sugar: r1(num(e.sugar) * q), sodium: r0(num(e.sodium) * q) };
-}
-
-function clampRange(input) {
-  const today = todayKey();
-  const min = new Date(); min.setFullYear(min.getFullYear() - HISTORY_YEARS);
-  const ok = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
-  let start = ok(input.start_date) ? String(input.start_date) : today;
-  let end = ok(input.end_date) ? String(input.end_date) : today;
-  if (start > end) [start, end] = [end, start];
-  if (start < ymd(min)) start = ymd(min);
-  if (end > today) end = today;
-  return [start, end];
-}
-
-const CHAT_TOOLS = [
-  {
-    name: "get_food_log",
-    description: "Returns what this person logged between two dates (inclusive, YYYY-MM-DD). Up to 45 days returns every food with its meal and nutrition; longer ranges return daily totals and the foods eaten each day. Days with nothing logged are left out.",
-    inputSchema: { type: "object", properties: { start_date: { type: "string" }, end_date: { type: "string" } }, required: ["start_date", "end_date"] },
-    async execute(input) {
-      const [start, end] = clampRange(input);
-      setLive(`Reading your log from ${start} to ${end}…`);
-      const days = await loadRange(start, end);
-      const span = (parseYmd(end) - parseYmd(start)) / 86400000 + 1;
-      const logged = days.filter(([, d]) => MEALS.some((m) => (d[m.id] || []).length));
-      if (span <= 45) {
-        const rows = logged.flatMap(([date, d]) => MEALS.flatMap((m) => (d[m.id] || []).map((e) => entryRow(date, m.id, e))));
-        return JSON.stringify({ start, end, days_logged: logged.length, entries: rows }).slice(0, 30000);
-      }
-      const out = logged.map(([date, d]) => {
-        const all = MEALS.flatMap((m) => d[m.id] || []);
-        const t = totalsOf(all);
-        return { date, kcal: r0(t.kcal), protein: r0(t.protein), carbs: r0(t.carbs), fat: r0(t.fat), sugar: r0(t.sugar), foods: all.map((e) => e.name).join("; ") };
-      });
-      let json = JSON.stringify({ start, end, days_logged: out.length, days: out });
-      if (json.length > 30000) json = JSON.stringify({ start, end, days_logged: out.length, note: "Too long to list foods; showing totals only. Use count_food for specific foods.", days: out.map(({ foods, ...rest }) => rest) }).slice(0, 30000);
-      return json;
-    },
-  },
-  {
-    name: "count_food",
-    description: "Counts how many times foods matching any of the keywords were logged between two dates, and returns the occurrences (date, meal, food, kcal, sugar). Matching is case-insensitive on the food name, so pass several variants, e.g. for bubble tea: [\"bubble tea\",\"milk tea\",\"boba\",\"brown sugar\",\"pearl\"].",
-    inputSchema: { type: "object", properties: { keywords: { type: "array", items: { type: "string" } }, start_date: { type: "string" }, end_date: { type: "string" } }, required: ["keywords", "start_date", "end_date"] },
-    async execute(input) {
-      const [start, end] = clampRange(input);
-      const kws = (Array.isArray(input.keywords) ? input.keywords : [input.keywords]).map((k) => String(k).toLowerCase().trim()).filter(Boolean);
-      if (!kws.length) throw new Error("Give at least one keyword");
-      setLive(`Searching your log for ${kws[0]}…`);
-      const days = await loadRange(start, end);
-      const hits = [];
-      for (const [date, d] of days) for (const m of MEALS) for (const e of d[m.id] || []) {
-        if (kws.some((k) => String(e.name).toLowerCase().includes(k))) hits.push(entryRow(date, m.id, e));
-      }
-      return JSON.stringify({ start, end, times: hits.length, total_servings: r1(hits.reduce((s, h) => s + h.servings, 0)),
-        total_kcal: r0(hits.reduce((s, h) => s + h.kcal, 0)), total_sugar_g: r0(hits.reduce((s, h) => s + h.sugar, 0)), occurrences: hits.slice(-80) });
-    },
-  },
-  {
-    name: "search_sg_foods",
-    description: "Searches the tracker's Singapore food list (hawker dishes, kopitiam drinks, fast food, bubble tea, supermarket brands) and returns foods with nutrition per serving. Use it to recommend foods; filter with max_kcal and min_protein.",
-    inputSchema: { type: "object", properties: { query: { type: "string", description: "Words in the food name, or empty for any" }, max_kcal: { type: "number" }, min_protein: { type: "number" }, category: { type: "string", description: "Optional, e.g. Hawker, Fast Food, Drinks, Bubble Tea, Japanese" } } },
-    async execute(input) {
-      const q = String(input.query || "");
-      let list = q ? searchFoods(q, "All", 400) : allFoods();
-      if (input.category) list = list.filter((f) => f.category.toLowerCase() === String(input.category).toLowerCase());
-      if (input.max_kcal != null) list = list.filter((f) => f.kcal <= num(input.max_kcal));
-      if (input.min_protein != null) list = list.filter((f) => f.protein >= num(input.min_protein));
-      if (!q) list = [...list].sort((a, b) => b.protein / Math.max(b.kcal, 1) - a.protein / Math.max(a.kcal, 1));
-      return JSON.stringify(list.slice(0, 30).map((f) => ({ name: f.name, category: f.category, serving: f.serving, kcal: f.kcal, protein: f.protein, carbs: f.carbs, fat: f.fat, sugar: f.sugar, sodium: f.sodium })));
-    },
-  },
-];
-
-function chatRules() {
-  const a = account();
-  const g = goals();
-  const today = todayKey();
-  const t = dayTotals(today);
-  const day = dayData(today);
-  const todayFoods = MEALS.map((m) => `${m.name}: ${day[m.id].map((e) => `${e.name}${num(e.qty) !== 1 ? ` x${r1(num(e.qty))}` : ""} (${r0(e.kcal * e.qty)} kcal)`).join(", ") || "nothing yet"}`).join("\n");
-  const plan = planNextMeal();
-  return `You are the assistant inside "Grace's Calorie Tracker", a food diary app for people living in Singapore. You are talking with ${a?.name || "the user"}.
-Today is ${new Date().toLocaleDateString("en-SG", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} (${today}). Weeks start on Sunday.
-Daily goals: ${g.kcal} kcal, protein ${g.protein}g, carbs ${g.carbs}g, fat ${g.fat}g, sugar ${g.sugar}g, sodium ${g.sodium}mg.
-Today so far: ${r0(t.kcal)} kcal, protein ${r0(t.protein)}g, carbs ${r0(t.carbs)}g, fat ${r0(t.fat)}g, sugar ${r0(t.sugar)}g, sodium ${r0(t.sodium)}mg.
-${todayFoods}
-Next meal: ${mealName(plan.next)}, with about ${Math.max(0, plan.remaining)} kcal left today.
-
-How to answer:
-- For any question about past eating, call get_food_log or count_food with the right date range. Never guess what was eaten. History goes back up to 10 years.
-- For "how many times" questions, use count_food with several name variants.
-- To recommend food, call search_sg_foods and pick local options that fit the calories left and the protein still needed. Give kcal for each pick.
-- Keep answers short and friendly: the direct answer first, then a few bullet points if useful. Use **bold** for key numbers. No tables or headings.
-- If nothing was logged in a period, say so plainly.
-- You can't add or change log entries. If asked, tell the person to use the Scan or Manual buttons.`;
-}
-
-async function sendChat(text) {
-  const msg = String(text || "").trim();
-  if (!msg || chat.busy) return;
-  if (!state.sample) { toast("The assistant works when the tracker is opened inside Claude."); return; }
-  chat.turns.push({ role: "user", content: msg });
-  chat.busy = true; chat.status = "Thinking…";
-  chat.ctl = new AbortController();
-  refreshChat();
-  if ($("#chatText")) $("#chatText").value = "";
-  const history = chat.turns.slice(-12);
-  const useTools = !!state.sampleLimits?.tools;
-  try {
-    const { text: answer } = await state.sample([{ role: "user", content: chatRules() }, ...history], {
-      cache: false, signal: chat.ctl.signal,
-      ...(useTools ? { tools: CHAT_TOOLS } : {}),
-      onText: ({ text: t }) => setLive(t),
+function authView(view, msg) {
+  const card = $("#authCard");
+  const message = msg ? `<p class="form-msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</p>` : "";
+  if (view === "signin") {
+    card.innerHTML = `
+      <h2>Sign in</h2>
+      <p class="lead">Use your username or email.</p>
+      <form id="authForm" class="stack" novalidate>
+        <div class="field"><label for="aLogin">Username or email</label><input id="aLogin" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
+        <div class="field"><label for="aPw">Password</label><input id="aPw" type="password" autocomplete="current-password" required></div>
+        <button class="primary" type="submit" id="aSubmit" style="margin-top:4px">Sign in</button>
+      </form>
+      ${message}
+      <div class="auth-links"><button data-auth="forgot">Forgot password?</button><button data-auth="signup">Create an account</button></div>`;
+    $("#authForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const login = $("#aLogin").value, pw = $("#aPw").value;
+      if (!login.trim() || !pw) return authView("signin", { text: "Enter your username or email and your password." });
+      $("#aSubmit").disabled = true;
+      try {
+        const email = await resolveEmail(login);
+        if (!email) return authView("signin", { text: "That username or password is wrong." });
+        await fb.signIn(fb.auth, email, pw);
+      } catch (err) { authView("signin", { text: authError(err) }); }
     });
-    chat.turns.push({ role: "assistant", content: answer });
-  } catch (e) {
-    const msgFor = {
-      cancelled: e?.text || "Stopped.",
-      not_granted: "The assistant needs your permission to use Claude. Allow it when asked, then try again.",
-      rate_limited: "I've hit a usage limit for now. Try again in a little while.",
-      refused: "I can't help with that one. Try asking another way.",
-      prompt_too_large: "That was too much to read at once. Ask about a shorter period.",
-    };
-    chat.turns.push({ role: "assistant", content: msgFor[e?.code] || (e?.text ? e.text + "\n\n(The answer was cut off. Try again.)" : "Something went wrong. Try again.") });
-  } finally {
-    chat.busy = false; chat.status = ""; chat.ctl = null;
-    refreshChat();
+  } else if (view === "signup") {
+    card.innerHTML = `
+      <h2>Create an account</h2>
+      <p class="lead">Your log syncs to any phone you sign in on.</p>
+      <form id="authForm" class="stack" novalidate>
+        <div class="field"><label for="sUser">Username</label><input id="sUser" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. Grace"><div class="hint">3–20 letters, numbers, dots, dashes or underscores.</div></div>
+        <div class="field"><label for="sEmail">Email</label><input id="sEmail" type="email" autocomplete="email" autocapitalize="none" spellcheck="false"><div class="hint">Used to reset your password if you forget it.</div></div>
+        <div class="field"><label for="sPw">Password</label><input id="sPw" type="password" autocomplete="new-password"><div class="hint">At least 6 characters.</div></div>
+        <div class="field"><label for="sKcal">Daily calorie goal (kcal)</label><input id="sKcal" type="number" inputmode="numeric" value="1800" min="800" max="6000"></div>
+        <button class="primary" type="submit" id="aSubmit" style="margin-top:4px">Create account</button>
+      </form>
+      ${message}
+      <div class="auth-links"><button data-auth="signin">I already have an account</button></div>`;
+    $("#authForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = $("#sUser").value.trim(), email = $("#sEmail").value.trim(), pw = $("#sPw").value;
+      const kcal = Math.min(6000, Math.max(800, num($("#sKcal").value) || 1800));
+      if (!/^[A-Za-z0-9_.-]{3,20}$/.test(username)) return authView("signup", { text: "Usernames are 3–20 letters, numbers, dots, dashes or underscores." });
+      if (!email.includes("@")) return authView("signup", { text: "Enter your email address." });
+      if (pw.length < 6) return authView("signup", { text: "Use a password of at least 6 characters." });
+      $("#aSubmit").disabled = true;
+      state.signingUp = true;
+      try {
+        const taken = await fb.getDoc(fb.doc(`usernames/${username.toLowerCase()}`));
+        if (taken.exists()) { state.signingUp = false; return authView("signup", { text: "That username is taken. Pick another one." }); }
+        const cred = await fb.signUp(fb.auth, email, pw);
+        const u = cred.user.uid;
+        await fb.setDoc(fb.doc(`usernames/${username.toLowerCase()}`), { uid: u, email });
+        await fb.setDoc(fb.doc(`users/${u}`), { username, email, goals: goalsFor(kcal), recents: [], customFoods: [], createdAt: new Date().toISOString() });
+      } catch (err) {
+        authView("signup", { text: authError(err) });
+      } finally {
+        state.signingUp = false;
+      }
+    });
+  } else if (view === "forgot") {
+    card.innerHTML = `
+      <h2>Reset your password</h2>
+      <p class="lead">Enter your username or email. We'll email you a link to choose a new password.</p>
+      <form id="authForm" class="stack" novalidate>
+        <div class="field"><label for="fLogin">Username or email</label><input id="fLogin" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+        <button class="primary" type="submit" id="aSubmit" style="margin-top:4px">Send reset link</button>
+      </form>
+      ${message}
+      <div class="auth-links"><button data-auth="signin">Back to sign in</button></div>`;
+    $("#authForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const login = $("#fLogin").value;
+      if (!login.trim()) return authView("forgot", { text: "Enter your username or email." });
+      $("#aSubmit").disabled = true;
+      try {
+        const email = await resolveEmail(login);
+        if (email) await sendReset(email);
+        authView("signin", { ok: true, text: "If that account exists, a reset link is on its way to its email. Check your spam folder too." });
+      } catch (err) { authView("forgot", { text: authError(err) }); }
+    });
   }
 }
 
 // ---------- Events ----------
-$("#days").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-date]");
-  if (!b) return;
-  state.selectedDate = parseYmd(b.dataset.date);
-  renderAll();
-});
-$("#prevWeek").addEventListener("click", () => { state.selectedDate.setDate(state.selectedDate.getDate() - 7); renderAll(); });
-$("#nextWeek").addEventListener("click", () => { state.selectedDate.setDate(state.selectedDate.getDate() + 7); renderAll(); });
-$("#dateJump").addEventListener("change", (e) => { if (e.target.value) { state.selectedDate = parseYmd(e.target.value); renderAll(); } });
-$("#accountBtn").addEventListener("click", () => openSheet(null, account() ? "settings" : "accounts"));
+function bindEvents() {
+  $("#authCard").addEventListener("click", (e) => { const b = e.target.closest("[data-auth]"); if (b) authView(b.dataset.auth); });
+  $("#days").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-date]");
+    if (!b) return;
+    state.selectedDate = parseYmd(b.dataset.date);
+    renderAll();
+  });
+  $("#prevWeek").addEventListener("click", () => { state.selectedDate.setDate(state.selectedDate.getDate() - 7); renderAll(); });
+  $("#nextWeek").addEventListener("click", () => { state.selectedDate.setDate(state.selectedDate.getDate() + 7); renderAll(); });
+  $("#dateJump").addEventListener("change", (e) => { if (e.target.value) { state.selectedDate = parseYmd(e.target.value); renderAll(); } });
+  $("#profileBtn").addEventListener("click", () => openSheet(null, "profile"));
 
-$("#meals").addEventListener("click", (e) => {
-  const add = e.target.closest("[data-add]");
-  if (add) return openSheet(add.dataset.add, "add");
-  const del = e.target.closest("[data-del]");
-  if (del) { const [m, id] = del.dataset.del.split(":"); removeEntry(m, id); }
-});
-$("#recs").addEventListener("click", (e) => {
-  const r = e.target.closest("[data-rec]");
-  if (r) { openSheet(state.recPlan?.next, "detail", state.recList[+r.dataset.rec]); return; }
-  if (e.target.closest("#askPick")) openSheet(null, "chat", `What should I eat for ${mealName(state.recPlan?.next || "dinner").toLowerCase()}?`);
-});
+  $("#meals").addEventListener("click", (e) => {
+    const add = e.target.closest("[data-add]");
+    if (add) return openSheet(add.dataset.add, "add");
+    const del = e.target.closest("[data-del]");
+    if (del) { const [m, id] = del.dataset.del.split(":"); removeEntry(m, id); }
+  });
+  $("#recs").addEventListener("click", (e) => {
+    const r = e.target.closest("[data-rec]");
+    if (r) openSheet(state.recPlan?.next, "detail", state.recList[+r.dataset.rec]);
+  });
 
-$("#fabScan").addEventListener("click", () => {
-  if (!account()) return openSheet(null, "accounts");
-  sheet.meal = ymd(state.selectedDate) === todayKey() ? mealForNow() : sheet.meal;
-  startScan();
-});
-$("#fabManual").addEventListener("click", () => openSheet(null, "add"));
-$("#fabAsk").addEventListener("click", () => openSheet(null, "chat", ""));
-$("#cameraInput").addEventListener("change", (e) => handlePhoto(e.target.files[0]));
+  $("#fabScan").addEventListener("click", () => openSheet(null, "scan"));
+  $("#fabManual").addEventListener("click", () => openSheet(null, "add"));
+  $("#fabHistory").addEventListener("click", () => openSheet(null, "history"));
+  $("#photoInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = ""; // drop the reference to the photo
+    if (!file) return;
+    if (!sheetOpen()) openSheet(null, "scan");
+    $("#sheetBody").innerHTML = '<div class="spinner"></div><p class="scan-status">Reading the barcode…</p>';
+    const code = await decodePhoto(file);
+    if (code) handleCode(code);
+    else { show("scan", null, false); toast("No barcode found in that photo. Try again closer up."); }
+  });
 
-$("#scrim").addEventListener("click", closeSheet);
-$("#sheetClose").addEventListener("click", closeSheet);
-$("#sheetBack").addEventListener("click", back);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+  $("#scrim").addEventListener("click", closeSheet);
+  $("#sheetClose").addEventListener("click", closeSheet);
+  $("#sheetBack").addEventListener("click", back);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stopCamera(); });
 
-$("#mealTabs").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-meal]");
-  if (!b) return;
-  sheet.meal = b.dataset.meal;
-  const top = sheet.stack[sheet.stack.length - 1];
-  show(top[0], top[0] === "scan" ? scanState : top[1], false);
-});
+  $("#mealTabs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-meal]");
+    if (!b) return;
+    sheet.meal = b.dataset.meal;
+    $("#mealTabs").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    const top = sheet.stack[sheet.stack.length - 1];
+    if (top && top[0] !== "scan") show(top[0], top[1], false);
+  });
 
-$("#sheetBody").addEventListener("click", (e) => {
-  const pick = e.target.closest("[data-pick]");
-  if (pick) return show("detail", pickList[+pick.dataset.pick]);
-  const acct = e.target.closest("[data-account]");
-  if (acct) { selectAccount(acct.dataset.account); closeSheet(); toast(`Switched to ${account()?.name || "account"}`); return; }
-  const sug = e.target.closest("[data-suggest]");
-  if (sug) return sendChat(sug.dataset.suggest);
-  const act = e.target.closest("[data-act]")?.dataset.act;
-  if (!act) return;
-  if (act === "scan") startScan();
-  else if (act === "custom") show("custom", {});
-  else if (act === "custom-q") show("custom", { name: $("#q")?.value || "" });
-  else if (act === "settings") show("settings");
-  else if (act === "accounts") show("accounts");
-  else if (act === "new-account") show("newAccount");
-  else if (act === "back-search") { sheet.stack = []; show("add"); }
-  else if (act === "ai-edit") show("custom", pickList[0]);
-});
+  $("#sheetBody").addEventListener("click", (e) => {
+    const pick = e.target.closest("[data-pick]");
+    if (pick) return show("detail", pickList[+pick.dataset.pick]);
+    const actEl = e.target.closest("[data-act]");
+    if (!actEl) return;
+    const act = actEl.dataset.act;
+    if (act === "scan") show("scan");
+    else if (act === "photo") { stopCamera(); $("#photoInput").click(); }
+    else if (act === "custom") show("custom", {});
+    else if (act === "custom-q") show("custom", { name: $("#q")?.value || "" });
+    else if (act === "custom-barcode") show("custom", { barcode: actEl.dataset.code });
+  });
+}
 
 // ---------- Boot ----------
+function showSetupNeeded() {
+  $("#authScreen").hidden = false;
+  $("#authCard").innerHTML = `<div class="setup"><h2>Almost ready</h2>
+    <p>This copy of the app isn't connected to its database yet. Paste your Firebase settings into <b>firebase-config.js</b>, following the setup steps in the README, then reload.</p></div>`;
+}
+
 async function boot() {
-  renderAll(false);
-  const claude = window.claude;
-  let db = null, user = null, sample = null;
-  if (claude?.use) [db, user, sample] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("sample")]);
-  if (db) {
-    state.db = db; state.mode = "cloud";
-    try { state.myId = (await user?.id()) || null; } catch { state.myId = null; }
-  } else {
-    state.db = createLocalDb(); state.mode = "local";
-    showBanner(claude?.use
-      ? "You're signed out of Claude, so this is saved on this device only. Sign in to sync between devices."
-      : "Saved on this device only. Open the tracker inside Claude to sync between devices.");
+  bindEvents();
+  if (!firebaseConfig?.apiKey || /PASTE/i.test(firebaseConfig.apiKey)) { showSetupNeeded(); return; }
+  try { await loadFirebase(); }
+  catch (e) {
+    console.error(e);
+    $("#authScreen").hidden = false;
+    $("#authCard").innerHTML = '<div class="setup"><h2>Can\'t connect</h2><p>The app couldn\'t load. Check your internet connection and reload.</p></div>';
+    return;
   }
-  state.sample = sample;
-  if (sample) { try { state.sampleLimits = await sample.limits(); } catch { state.sampleLimits = null; } }
-  subscribeAccounts();
+  fb.onAuthStateChanged(fb.auth, (user) => {
+    stopSubscriptions();
+    state.user = user;
+    if (!user) {
+      closeSheet();
+      $("#appScreen").hidden = true;
+      $("#authScreen").hidden = false;
+      authView("signin");
+      return;
+    }
+    $("#authScreen").hidden = true;
+    $("#appScreen").hidden = false;
+    state.selectedDate = parseYmd(todayKey());
+    subscribeProfile();
+    renderAll();
+  });
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 boot();
-})();

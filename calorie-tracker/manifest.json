@@ -1,0 +1,16 @@
+{
+  "name": "Grace's Calorie Tracker",
+  "short_name": "Calories",
+  "description": "Track what you eat in Singapore.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1eefb",
+  "theme_color": "#4c1fd6",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
