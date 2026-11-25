@@ -62,6 +62,7 @@ function toast(msg) {
 }
 
 const ICON = {
+  scale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 9.5a5 5 0 0 1 8 0"/><path d="M12 9.5l1.5-2"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
@@ -141,6 +142,7 @@ function dayData(dateKey) {
   const d = state.months[monthOf(dateKey)]?.days?.[dateKey] || {};
   const out = {};
   for (const meal of MEALS) out[meal.id] = Array.isArray(d[meal.id]) ? d[meal.id] : [];
+  if (d.weight !== undefined) out.weight = d.weight;
   return out;
 }
 
@@ -387,6 +389,43 @@ function renderMeals() {
   $("#meals").innerHTML = html;
 }
 
+// ---------- Weight (optional, one reading per day, in kg) ----------
+const hasWeight = (d) => d && typeof d.weight === "number" && d.weight > 0;
+function setWeight(dateKey, kg) {
+  const day = dayData(dateKey);
+  return writeDay(dateKey, { ...day, weight: kg === null ? null : Math.round(kg * 10) / 10 });
+}
+// Latest reading before a date, from the months already loaded on this device.
+function previousWeight(dateKey) {
+  let best = null;
+  for (const m of Object.values(state.months)) for (const [k, d] of Object.entries(m?.days || {})) {
+    if (k < dateKey && hasWeight(d) && (!best || k > best[0])) best = [k, d.weight];
+  }
+  return best;
+}
+const kg = (v) => `${(Math.round(v * 10) / 10).toFixed(1)} kg`;
+
+function renderWeight() {
+  const sel = ymd(state.selectedDate);
+  const d = dayData(sel);
+  const prev = previousWeight(sel);
+  let main, sub;
+  if (hasWeight(d)) {
+    main = kg(d.weight);
+    if (prev) {
+      const diff = Math.round((d.weight - prev[1]) * 10) / 10;
+      sub = diff === 0 ? `Same as ${relDay(prev[0])}` : `${diff > 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} kg since ${relDay(prev[0])}`;
+    } else sub = "Tap to change";
+  } else {
+    main = sel === todayKey() ? "Log today's weight" : "Log weight for this day";
+    sub = prev ? `Last: ${kg(prev[1])} (${relDay(prev[0])})` : "Optional";
+  }
+  $("#weight").innerHTML = `<button class="weight-card" data-act-main="weight">
+    <span class="w-ico">${ICON.scale}</span>
+    <span class="w-txt"><b>${esc(main)}</b><small>${esc(sub)}</small></span>
+    <span class="w-go">${hasWeight(d) ? "Edit" : "Add"}</span></button>`;
+}
+
 // ---------- Recommendations ----------
 // Only foods with official nutrition data are recommended.
 const BREAKFAST_RE = /prata|thosai|dosa|porridge|congee|chee cheong|chwee|kaya|toast|you tiao|carrot cake|lor mee|fishball|bee hoon|nasi lemak|mee siam|mee rebus|popiah|soon kueh|png kueh|bread|bun|muffin|hotcake|pancake|egg|oat|cereal|idli|appam|putu|kueh|sandwich|breakfast|wrap|bagel|croissant/i;
@@ -502,6 +541,7 @@ function renderAll(subs = true) {
   renderBars();
   renderSpentLine();
   renderMeals();
+  renderWeight();
   renderRecs();
   renderSummary();
 }
@@ -564,6 +604,7 @@ function copyDay(fromKey) {
   const day = dayData(toKey);
   const next = { ...day };
   for (const m of MEALS) next[m.id] = [...day[m.id], ...src[m.id].map((e) => ({ ...e, id: uid(), at: new Date().toISOString() }))];
+  // (weight belongs to its own day and isn't copied)
   return writeDay(toKey, next);
 }
 
@@ -589,6 +630,55 @@ function openSheet(mealId, view = "add", arg) {
   $("#scrim").classList.add("open");
   $("#sheet").classList.add("open");
   show(view, arg);
+}
+
+// Drag the sheet down to close it: from the grip/title bar anywhere, or from the content when it's scrolled to the top.
+function enableSheetDrag() {
+  const el = $("#sheet"), body = $("#sheetBody"), scrim = $("#scrim");
+  let y0 = null, x0 = 0, dy = 0, t0 = 0, decided = false, fromBody = false;
+  const begin = (x, y, isBody) => { y0 = y; x0 = x; dy = 0; t0 = Date.now(); decided = !isBody; fromBody = isBody; if (!isBody) el.style.transition = "none"; };
+  const reset = () => { el.style.transition = ""; el.style.transform = ""; scrim.style.opacity = ""; };
+  const move = (x, y, e) => {
+    if (y0 === null) return;
+    if (!decided) {
+      const ady = y - y0, adx = Math.abs(x - x0);
+      if (Math.abs(ady) < 8 && adx < 8) return;
+      // From the content: only a downward drag while already at the top closes; anything else is a normal scroll.
+      if (ady <= 0 || adx > Math.abs(ady) || body.scrollTop > 0) { y0 = null; return; }
+      decided = true; el.style.transition = "none";
+    }
+    dy = Math.max(0, y - y0);
+    el.style.transform = `translateY(${dy}px)`;
+    scrim.style.opacity = String(Math.max(0.2, 1 - dy / 500));
+    if (e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if (y0 === null) return;
+    y0 = null;
+    const fast = dy / Math.max(1, Date.now() - t0) > 0.5 && dy > 40;
+    const shut = decided && (dy > Math.min(160, el.offsetHeight * 0.25) || fast);
+    reset();
+    if (shut) closeSheet();
+  };
+  const grabZone = (t) => t.closest(".sheet-grip, .sheet-head") && !t.closest("button, input, select");
+  el.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    if (grabZone(e.target)) begin(t.clientX, t.clientY, false);
+    else if (body.contains(e.target) && body.scrollTop <= 0 && !e.target.closest("video, .chips, .meal-tabs, .rec-row")) begin(t.clientX, t.clientY, true);
+  }, { passive: true });
+  el.addEventListener("touchmove", (e) => { const t = e.touches[0]; move(t.clientX, t.clientY, e); }, { passive: false });
+  el.addEventListener("touchend", end);
+  el.addEventListener("touchcancel", () => { y0 = null; reset(); });
+  // Mouse: drag the grip or title bar.
+  el.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || !grabZone(e.target)) return;
+    begin(e.clientX, e.clientY, false);
+    const mm = (ev) => move(ev.clientX, ev.clientY, ev);
+    const mu = () => { window.removeEventListener("mousemove", mm); window.removeEventListener("mouseup", mu); end(); };
+    window.addEventListener("mousemove", mm);
+    window.addEventListener("mouseup", mu);
+  });
 }
 
 function closeSheet() {
@@ -1438,6 +1528,59 @@ const VIEWS = {
     runSpending();
   },
 
+  weight(body) {
+    const sel = ymd(state.selectedDate);
+    const d = dayData(sel);
+    $("#sheetTitle").textContent = "Weight";
+    renderMealTabs(false);
+    const prev = previousWeight(sel);
+    body.innerHTML = `
+      <div class="field"><label for="wIn">Weight on ${esc(sel === todayKey() ? "today" : prettyDate(sel, { weekday: "short", day: "numeric", month: "short", year: "numeric" }))} (kg)</label>
+        <input id="wIn" type="number" inputmode="decimal" min="20" max="400" step="0.1" placeholder="${prev ? esc(String(prev[1])) : "e.g. 55.0"}" value="${hasWeight(d) ? esc(d.weight.toFixed(1)) : ""}"></div>
+      <button class="primary" id="wSave">Save weight</button>
+      ${hasWeight(d) ? '<button class="secondary danger" id="wDel">Remove this reading</button>' : ""}
+      <div class="section-label">Last 90 days</div>
+      <div id="wOut"><div class="spinner"></div></div>`;
+    setTimeout(() => $("#wIn")?.focus(), 250);
+    $("#wSave", body).addEventListener("click", () => {
+      const v = num($("#wIn", body).value);
+      if (!(v >= 20 && v <= 400)) return toast("Enter your weight in kg");
+      setWeight(sel, v).catch(() => {});
+      closeSheet();
+      toast("Weight saved");
+    });
+    $("#wDel", body)?.addEventListener("click", () => { setWeight(sel, null).catch(() => {}); closeSheet(); toast("Removed"); });
+    const start = shiftDay(todayKey(), -89);
+    loadRange(start, todayKey()).then((days) => {
+      const out = $("#wOut");
+      if (!out) return;
+      const pts = days.filter(([, x]) => hasWeight(x)).map(([k, x]) => [k, x.weight]);
+      if (!pts.length) { out.innerHTML = '<p class="muted">No readings yet. Log your weight now and then to see the trend here.</p>'; return; }
+      const W = 320, H = 120, pad = 8;
+      // The chart spans from the first reading (at least a week back) to today.
+      const from = [pts[0][0], shiftDay(todayKey(), -6)].sort()[0];
+      const t0 = parseYmd(from).getTime(), t1 = parseYmd(todayKey()).getTime();
+      const vals = pts.map((p) => p[1]);
+      const lo = Math.min(...vals) - 0.5, hi = Math.max(...vals) + 0.5;
+      const xy = ([k, v]) => [pad + ((parseYmd(k).getTime() - t0) / Math.max(1, t1 - t0)) * (W - 2 * pad), pad + (1 - (v - lo) / (hi - lo)) * (H - 2 * pad)];
+      const line = pts.map((p, i) => (i ? "L" : "M") + xy(p).map((n) => n.toFixed(1)).join(" ")).join(" ");
+      const first = pts[0], last = pts[pts.length - 1];
+      const change = Math.round((last[1] - first[1]) * 10) / 10;
+      out.innerHTML = `
+        <div class="stat-row">
+          <div class="stat"><div class="k">Latest</div><div class="v">${last[1].toFixed(1)}<small>kg</small></div></div>
+          <div class="stat"><div class="k">Change</div><div class="v">${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(1)}<small>kg</small></div></div>
+          <div class="stat"><div class="k">Readings</div><div class="v">${pts.length}</div></div>
+        </div>
+        ${pts.length > 1 ? `<div class="card-box"><svg class="w-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight over the last 90 days">
+          <path d="${line}" fill="none" stroke="var(--purple)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          ${pts.map((p) => { const [x, y] = xy(p); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="var(--card)" stroke="var(--purple)" stroke-width="2"><title>${esc(prettyDate(p[0]))}: ${p[1].toFixed(1)} kg</title></circle>`; }).join("")}
+        </svg><div class="w-axis"><span>${esc(prettyDate(from))}</span><span>Today</span></div></div>` : ""}
+        <ul class="top-foods" style="margin-top:12px">${pts.slice().reverse().slice(0, 15).map(([k, v]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}</span><span>${v.toFixed(1)} kg</span></li>`).join("")}</ul>
+        <p class="note">Change is from your first reading in this period (${esc(prettyDate(first[0]))}).</p>`;
+    }).catch(() => { const out = $("#wOut"); if (out) out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; });
+  },
+
   history(body) {
     $("#sheetTitle").textContent = "History";
     renderMealTabs(false);
@@ -1867,6 +2010,8 @@ function bindEvents() {
   $("#dateJump").addEventListener("change", (e) => { if (e.target.value) { state.selectedDate = parseYmd(e.target.value); renderAll(); } });
   $("#profileBtn").addEventListener("click", () => openSheet(null, "profile"));
 
+  $("#weight").addEventListener("click", (e) => { if (e.target.closest("[data-act-main=weight]")) openSheet(null, "weight"); });
+  enableSheetDrag();
   $("#meals").addEventListener("click", (e) => {
     const add = e.target.closest("[data-add]");
     if (add) return openSheet(add.dataset.add, "add");

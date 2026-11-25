@@ -180,7 +180,9 @@
   .scrim.open { opacity: 1; pointer-events: auto; }
   .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-width: 640px; margin: 0 auto; background: var(--bg); border-radius: 24px 24px 0 0; height: 92vh; display: flex; flex-direction: column; transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1); padding-bottom: env(safe-area-inset-bottom, 0px); }
   .sheet.open { transform: translateY(0); }
-  .sheet-grip { width: 40px; height: 5px; border-radius: 9px; background: var(--line); margin: 10px auto 4px; flex: none; }
+  .sheet-grip { width: 100%; height: 22px; flex: none; position: relative; cursor: grab; touch-action: none; }
+  .sheet-grip::before { content: ""; position: absolute; left: 50%; top: 9px; width: 40px; height: 5px; margin-left: -20px; border-radius: 9px; background: var(--line); }
+  .sheet-head { cursor: grab; }
   .sheet-head { display: flex; align-items: center; gap: 8px; padding: 6px 16px 10px; flex: none; }
   .sheet-head h3 { flex: 1; margin: 0; font-size: 18px; font-weight: 600; min-width: 0; }
   .round { width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; flex: none; }
@@ -321,6 +323,15 @@
   .schemes button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; border-radius: 14px; background: var(--card); border: 2px solid transparent; font-size: 13px; font-weight: 600; color: var(--ink-2); box-shadow: var(--shadow); }
   .schemes button.on { border-color: var(--purple); color: var(--ink); }
   .schemes i { width: 36px; height: 36px; border-radius: 50%; display: block; }
+  .weight-card { width: 100%; display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 12px 14px; background: var(--card); border-radius: 16px; box-shadow: var(--shadow); text-align: left; }
+  .w-ico { width: 38px; height: 38px; border-radius: 12px; background: var(--soft); color: var(--purple); display: grid; place-items: center; flex: none; }
+  .w-ico svg { width: 20px; height: 20px; }
+  .w-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .w-txt b { font-size: 15px; font-weight: 600; }
+  .w-txt small { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .w-go { font-size: 13px; font-weight: 600; color: var(--purple); }
+  .w-chart { width: 100%; height: auto; display: block; }
+  .w-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
   /* ---------- Prices & spending ---------- */
   .e-right { text-align: right; flex: none; }
   .e-price { font-size: 12px; font-weight: 600; color: #0e8a45; font-variant-numeric: tabular-nums; margin-top: 2px; }
@@ -414,6 +425,7 @@
 
   <main class="wrap">
     <section id="meals"></section>
+    <section id="weight"></section>
     <section class="recs" id="recs"></section>
     <section class="summary" id="summary"></section>
   </main>
