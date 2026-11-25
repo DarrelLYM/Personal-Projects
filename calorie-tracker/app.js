@@ -1185,9 +1185,10 @@ const VIEWS = {
         This app is not endorsed by the Health Promotion Board.</p>
         <p><b>McDonald's Singapore</b>${counts.mcd ? ` · ${counts.mcd} items` : ""}: nutrition facts published on <a href="https://www.mcdonalds.com.sg/nutrition-calculator" target="_blank" rel="noopener">mcdonalds.com.sg</a> (current as of ${esc(info.mcdAsOf || "Dec 2023")}). McDonald's doesn't publish sugar.</p>
         <p><b>Ya Kun Kaya Toast</b>${counts.yakun ? ` · ${counts.yakun} drinks` : ""}: official Nutrition Information Panel on <a href="https://app.yakun.com/nutritional-information" target="_blank" rel="noopener">yakun.com</a>, per 100ml, converted to each cup size.</p>
+        <p><b>KFC Singapore</b>${counts.kfc ? ` · ${counts.kfc} items` : ""}: official <a href="https://www.kfc.com.sg/nutritionandallergen" target="_blank" rel="noopener">Nutrition &amp; Allergen page</a>. KFC doesn't publish sugar for food items.</p>
         <p><b>Subway Singapore</b>${counts.subway ? ` · ${counts.subway} items` : ""}: official <a href="https://subwayisfresh.com.sg/wp-content/uploads/2022/02/Singapore-Nutrition-Information-Webguide-Feb-2022.pdf" target="_blank" rel="noopener">nutrition guide (Feb 2022)</a>. Subs, wraps, flatbreads and salads exclude sauce and cheese: add those separately (they're listed as add-ons). A footlong is double a 6-inch.</p>
         <p><b>Open Food Facts</b>${foodDb.packaged ? ` · ${foodDb.packaged.length.toLocaleString("en-SG")} packaged products` : ""}: data from <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">openfoodfacts.org</a>, available under the <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">Open Database License</a>. Refreshed weekly.</p>
-        ${counts.est ? `<p><b>Estimates</b> · ${counts.est} items from chains that don't publish nutrition data (e.g. KFC, Jollibee, bubble tea shops), shown with an Estimate tag. Most are rough values from general knowledge, written by the AI assistant that built this app, not from a published source. Two (Stuff'd, Potato Corner) come from third-party sites, named on the item. Treat them as a starting point and edit them after logging if you know better.</p>` : ""}
+        ${counts.est ? `<p><b>Estimates</b> · ${counts.est} items from chains that don't publish nutrition data (e.g. Jollibee, Burger King, bubble tea shops), shown with an Estimate tag. Most are rough values from general knowledge, written by the AI assistant that built this app, not from a published source. Two (Stuff'd, Potato Corner) come from third-party sites, named on the item. Treat them as a starting point and edit them after logging if you know better.</p>` : ""}
         <p class="note">Nutrition varies with portion size, recipe and preparation. Use these numbers as a guide, not medical advice.</p>
       </div>`;
   },
@@ -1297,7 +1298,7 @@ const VIEWS = {
       <button class="secondary" style="margin-top:0" data-act="about-data">Where the nutrition numbers come from</button>
       <button class="secondary" id="signOutBtn" style="margin-top:22px">Sign out</button>
       <button class="secondary danger" data-act="delete-account">Delete my account</button>
-      <p class="note">Nutrition data from HPB SG FoodID, McDonald's Singapore, Subway Singapore, Ya Kun and Open Food Facts. Tap "Where the nutrition numbers come from" for details and credits.</p>`;
+      <p class="note">Nutrition data from HPB SG FoodID, McDonald's, KFC and Subway Singapore, Ya Kun and Open Food Facts. Tap "Where the nutrition numbers come from" for details and credits.</p>`;
     $("#autoGoals", body).addEventListener("click", () => {
       const a = goalsFor(num($("#gKcal", body).value) || 1800);
       $("#gProtein", body).value = a.protein; $("#gCarbs", body).value = a.carbs; $("#gFat", body).value = a.fat;

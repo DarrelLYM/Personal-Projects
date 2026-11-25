@@ -63,9 +63,9 @@ Every food carries a tag shown in the app:
 
 | Tag | Source | Refreshed |
 |---|---|---|
-| **Official** | HPB [SG FoodID](https://pphtpc.hpb.gov.sg/web/sgfoodid) (lab-analysed and label data for local food), [McDonald's Singapore](https://www.mcdonalds.com.sg/nutrition-calculator), [Subway Singapore](https://subwayisfresh.com.sg/wp-content/uploads/2022/02/Singapore-Nutrition-Information-Webguide-Feb-2022.pdf) (Feb 2022 guide), [Ya Kun](https://app.yakun.com/nutritional-information) drinks | By running `scripts/foods/build.py` after updating the snapshots in `scripts/foods/sources/` |
+| **Official** | HPB [SG FoodID](https://pphtpc.hpb.gov.sg/web/sgfoodid) (lab-analysed and label data for local food), [McDonald's Singapore](https://www.mcdonalds.com.sg/nutrition-calculator), [KFC Singapore](https://www.kfc.com.sg/nutritionandallergen), [Subway Singapore](https://subwayisfresh.com.sg/wp-content/uploads/2022/02/Singapore-Nutrition-Information-Webguide-Feb-2022.pdf) (Feb 2022 guide), [Ya Kun](https://app.yakun.com/nutritional-information) drinks | By running `scripts/foods/build.py` after updating the snapshots in `scripts/foods/sources/` |
 | **Label** | [Open Food Facts](https://world.openfoodfacts.org) products sold in Singapore (nutrition labels typed in by volunteers) | Weekly, automatically (`.github/workflows/packaged-foods.yml` → `data/packaged.json`) |
-| **Estimate** | Chains with no published Singapore data (KFC, Jollibee, Burger King, Texas Chicken, Old Chang Kee, Starbucks, bubble tea, Stuff'd, Potato Corner…). Most are rough values from general knowledge, not a published source | Edit `scripts/foods/sources/estimates.json` |
+| **Estimate** | Chains with no published Singapore data (Jollibee, Burger King, Texas Chicken, Old Chang Kee, Starbucks, bubble tea, Stuff'd, Potato Corner…). Most are rough values from general knowledge, not a published source | Edit `scripts/foods/sources/estimates.json` |
 | **Yours** | Manual entries, quick adds and anything you edit | — |
 
 Licences: SG FoodID data is used under [HPB's licence](https://file.go.gov.sg/termsofuse-hpbsgfoodid.pdf), which requires the credit shown in the app under Profile → "Where the nutrition numbers come from". Open Food Facts data is under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/).

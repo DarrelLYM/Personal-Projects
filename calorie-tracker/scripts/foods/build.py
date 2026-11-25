@@ -6,6 +6,7 @@ Sources (each food keeps a tier and a source label):
   mcdonalds-sg.json   McDonald's Singapore nutrition facts (mcdonalds.com.sg). Official ("o").
   yakun-drinks.json   Ya Kun Nutrition Information Panel (per 100ml). Official ("o").
   subway-sg.json      Subway Singapore nutrition guide (Feb 2022). Official ("o").
+  kfc-sg.json         KFC Singapore Nutrition & Allergen page. Official ("o").
   estimates.json      Chains with no published data. Estimate ("e").
 
 Run:  python3 scripts/foods/build.py
@@ -177,6 +178,31 @@ for x in sw["items"]:
     items.append(rec)
 counts["subway"] = len(sw["items"])
 
+# ---------- KFC Singapore ----------
+kfc = load("kfc-sg.json")
+for x in kfc["items"]:
+    tab, name = x["tab"], x["name"].strip()
+    g = x.get("grams")
+    if tab == "Drinks":
+        kind, unit = "drink", f"1 drink ({'%g' % g}ml)" if g else "1 drink"
+    elif tab == "Chicken" or re.search(r"\(1pc\)|\(\d+pcs\)", name):
+        kind, unit = ("snack" if re.search(r"egg tart|hash brown|bacon", name, re.I) else "meal"), f"1 serving ({'%g' % g}g)" if g else "1 serving"
+    elif tab == "Bowls & Sides" and not re.search(r"bowl", name, re.I):
+        kind, unit = "snack", f"1 serving ({'%g' % g}g)" if g else "1 serving"
+    else:
+        kind, unit = "meal", f"1 serving ({'%g' % g}g)" if g else "1 serving"
+    if tab == "Chicken":
+        unit = f"1 piece ({'%g' % g}g)"
+    rec = {"i": "kfc-" + re.sub(r"[^a-z0-9]+", "-", (tab + " " + name).lower()).strip("-"), "n": name, "b": "KFC", "c": "Drinks" if tab == "Drinks" else "Restaurants",
+           "g": "KFC", "d": "kfc " + tab.lower(), "s": unit, "w": g, "k": r0(num(x["kcal"])), "p": r1(num(x["protein"])), "cb": r1(num(x["carbs"])),
+           "f": r1(num(x["fat"])), "su": r1(num(x.get("sugar"))), "na": r0(num(x.get("sodium"))), "t": "o", "src": "kfc", "sn": "Nutrition & Allergen page, Nov 2026", "kd": kind}
+    if rec["k"] is None:
+        continue
+    if tab == "KFC Breakfast":
+        rec["bf"] = 1
+    items.append(rec)
+counts["kfc"] = len(kfc["items"])
+
 # ---------- Estimates ----------
 est = load("estimates.json")
 for x in est:
@@ -202,6 +228,7 @@ out = {
         "hpb": {"label": "HPB SG FoodID", "url": "https://pphtpc.hpb.gov.sg/web/sgfoodid"},
         "mcd": {"label": "McDonald's Singapore", "url": "https://www.mcdonalds.com.sg/nutrition-calculator"},
         "yakun": {"label": "Ya Kun nutrition panel", "url": "https://app.yakun.com/nutritional-information"},
+        "kfc": {"label": "KFC Singapore", "url": "https://www.kfc.com.sg/nutritionandallergen"},
         "subway": {"label": "Subway Singapore nutrition guide", "url": "https://subwayisfresh.com.sg/wp-content/uploads/2022/02/Singapore-Nutrition-Information-Webguide-Feb-2022.pdf"},
         "est": {"label": "Estimate", "note": "No official data published"},
     },
