@@ -1,7 +1,7 @@
 {
   "name": "Grace's Calorie Tracker",
   "short_name": "Calories",
-  "description": "Track what you eat in Singapore.",
+  "description": "Track what you eat daily.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
