@@ -176,6 +176,7 @@ function subscribeProfile() {
   state.profileUnsub = fb.onSnapshot(ref, async (snap) => {
     if (snap.exists()) {
       state.profile = snap.data();
+      if ((state.profile.scheme || "purple") !== currentScheme()) applyScheme(state.profile.scheme || "purple");
       renderAll();
       if (!snap.metadata.fromCache && !state.profileChecked) { state.profileChecked = true; afterProfileLoad(); }
       return;
@@ -235,6 +236,60 @@ function totalsOf(entries) {
 }
 const dayTotals = (dateKey) => totalsOf(MEALS.flatMap((m) => dayData(dateKey)[m.id]));
 
+// ---------- Colour schemes ----------
+const SCHEMES = [
+  { id: "purple", name: "Purple", swatch: ["#4c1fd6", "#8b5cf6"], bar: "#4c1fd6" },
+  { id: "pink", name: "Baby pink", swatch: ["#e0629a", "#f8b4cf"], bar: "#e0629a" },
+  { id: "blue", name: "Baby blue", swatch: ["#3f8fdb", "#a5d3f6"], bar: "#3f8fdb" },
+];
+const currentScheme = () => document.documentElement.dataset.scheme || "purple";
+// Applies a scheme to the page. Kept on this device too, so the app opens in the right colours before the profile loads.
+function applyScheme(id) {
+  const c = SCHEMES.find((x) => x.id === id) || SCHEMES[0];
+  document.documentElement.dataset.scheme = c.id;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", c.bar);
+  try { localStorage.setItem("gct-scheme", c.id); } catch {}
+}
+
+// ---------- Prices (typed in by the user; never filled in automatically) ----------
+const SPEND_TYPES = [
+  { id: "fast", name: "Fast food", color: "#d6457f" },
+  { id: "hawker", name: "Hawker & kopitiam", color: "#12a150" },
+  { id: "drinks", name: "Bubble tea & drinks", color: "#f59e0b" },
+  { id: "cafe", name: "Café", color: "#9a5b34" },
+  { id: "conv", name: "Convenience store", color: "#2563eb" },
+  { id: "groc", name: "Groceries & packaged", color: "#7c3aed" },
+  { id: "other", name: "Other", color: "#9a7586" },
+];
+const spendTypeName = (id) => (SPEND_TYPES.find((t) => t.id === id) || SPEND_TYPES[6]).name;
+const FAST_RE = /mcdonald|kfc|subway|burger king|jollibee|texas chicken|mos burger|4fingers|pizza hut|domino|stuff'?d|potato corner|old chang kee|guzman|saladstop|popeyes|long john/i;
+const DRINK_RE = /liho|koi|gong cha|chicha|mixue|bubble tea|tiger sugar|playmade|each a cup|r&b|heytea|chagee/i;
+const CAFE_RE = /ya kun|toast box|starbucks|coffee bean|mr bean|kopitiam coffee/i;
+const GROCERY_CATS = /fruit|vegetable|dairy|nuts|sauces|sweets|snacks/i;
+// Best guess at the type of food for the spending breakdown; the user can change it per entry.
+function spendType(e) {
+  if (e.ptype && SPEND_TYPES.some((t) => t.id === e.ptype)) return e.ptype;
+  const who = `${e.brand || ""} ${e.source || ""} ${e.name || ""}`;
+  if (/7-eleven/i.test(who)) return "conv";
+  if (DRINK_RE.test(who)) return "drinks";
+  if (CAFE_RE.test(who)) return "cafe";
+  if (FAST_RE.test(who)) return "fast";
+  if (e.tier === "t" || e.barcode) return "groc";
+  if (/SG FoodID|HPB/i.test(e.source || "")) return GROCERY_CATS.test(e.category || "") ? "groc" : "hawker";
+  return "other";
+}
+const hasPrice = (e) => e.price !== null && e.price !== undefined && e.price !== "" && Number.isFinite(Number(e.price));
+const money = (v) => "$" + (Math.abs(v) >= 10000 ? Math.round(v).toLocaleString("en-SG") : num(v).toLocaleString("en-SG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const spentOf = (entries) => entries.reduce((s, e) => s + (hasPrice(e) ? num(e.price) : 0), 0);
+// Parses the price box: blank means "no price"; otherwise dollars rounded to cents.
+function readPrice(v) {
+  const t = String(v ?? "").replace(/[$,\s]/g, "");
+  if (t === "") return null;
+  const n = parseFloat(t);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : undefined;
+}
+const priceField = (id, val = "") => `<div class="field price-field"><label for="${id}">Price paid (optional)</label><div class="money-in"><span>$</span><input id="${id}" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" value="${esc(val ?? "")}"></div></div>`;
+
 // ---------- Rendering ----------
 function weekStart(d) { const s = new Date(d); s.setDate(s.getDate() - s.getDay()); s.setHours(0, 0, 0, 0); return s; }
 
@@ -270,6 +325,13 @@ function renderWeek() {
   $("#days").innerHTML = html;
 }
 
+function renderSpentLine() {
+  const entries = MEALS.flatMap((m) => dayData(ymd(state.selectedDate))[m.id]);
+  const el = $("#spentLine");
+  el.hidden = !entries.some(hasPrice);
+  el.innerHTML = el.hidden ? "" : `<b>${money(spentOf(entries))}</b> spent ${ymd(state.selectedDate) === todayKey() ? "today" : "this day"}`;
+}
+
 function renderBars() {
   const t = dayTotals(ymd(state.selectedDate));
   const g = goals();
@@ -300,7 +362,8 @@ function renderMeals() {
   let html = MEALS.map((m) => {
     const entries = day[m.id];
     const kcal = totalsOf(entries).kcal;
-    const sub = entries.length ? `${fmt(kcal)} kcal · ${entries.length} item${entries.length > 1 ? "s" : ""}` : "Optional · tap + to log";
+    const spent = entries.some(hasPrice) ? ` · ${money(spentOf(entries))}` : "";
+    const sub = entries.length ? `${fmt(kcal)} kcal · ${entries.length} item${entries.length > 1 ? "s" : ""}${spent}` : "Optional · tap + to log";
     return `<div class="meal">
       <div class="meal-head">
         <div class="meal-title"><h2>${m.name}${m.id === now ? '<span class="tag-now">now</span>' : ""}</h2><div class="sub">${sub}</div></div>
@@ -309,7 +372,7 @@ function renderMeals() {
       ${entries.length ? `<ul class="entries">${entries.map((e) => `
         <li class="entry">
           <button class="e-main e-edit" data-edit="${m.id}:${esc(e.id)}" aria-label="Edit ${esc(e.name)}"><div class="e-name">${esc(e.name)}</div><div class="e-meta">${entryMeta(e)}</div></button>
-          <div class="e-kcal">${fmt(num(e.kcal) * (num(e.qty) || 1))}</div>
+          <div class="e-right"><div class="e-kcal">${fmt(num(e.kcal) * (num(e.qty) || 1))}</div>${hasPrice(e) ? `<div class="e-price">${money(num(e.price))}</div>` : ""}</div>
           <button class="e-del" data-del="${m.id}:${esc(e.id)}" aria-label="Remove ${esc(e.name)}">${ICON.trash}</button>
         </li>`).join("")}</ul>` : ""}
     </div>`;
@@ -426,6 +489,8 @@ function renderSummary() {
     ["Sugar", fmt(t.sugar), `/ ${fmt(g.sugar)}g`],
     ["Sodium", fmt(t.sodium), `/ ${fmt(g.sodium)}mg`],
   ];
+  const dayEntries = MEALS.flatMap((m) => dayData(ymd(state.selectedDate))[m.id]);
+  if (dayEntries.some(hasPrice)) cells.push(["Spent", money(spentOf(dayEntries)), ""]);
   $("#summary").innerHTML = `<h3>Day summary</h3><div class="grid">${cells.map(([k, v, s]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v} <small>${s}</small></div></div>`).join("")}</div>`;
 }
 
@@ -435,6 +500,7 @@ function renderAll(subs = true) {
   renderHeader();
   renderWeek();
   renderBars();
+  renderSpentLine();
   renderMeals();
   renderRecs();
   renderSummary();
@@ -454,10 +520,11 @@ function compactFood(f) {
   return out;
 }
 
-function addEntry(mealId, food, qty, dateKey = ymd(state.selectedDate)) {
+function addEntry(mealId, food, qty, price = null, dateKey = ymd(state.selectedDate)) {
   const day = dayData(dateKey);
   const f = compactFood(food);
   const entry = { ...f, id: uid(), qty: r1(num(qty) * 100) / 100 || 1, at: new Date().toISOString() };
+  if (price !== null && price !== undefined) entry.price = price;
   writeDay(dateKey, { ...day, [mealId]: [...day[mealId], entry] }).catch(() => {});
   const recents = [f, ...(state.profile?.recents || []).filter((r) => !(r.name === f.name && r.serving === f.serving))].slice(0, 25);
   updateProfile({ recents }).catch(() => {});
@@ -953,6 +1020,98 @@ async function runHistory() {
     }).join("")}`;
 }
 
+// ---------- Spending ----------
+const spend = { period: "week", offset: 0, filter: "all" };
+const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function spendRange() {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const o = spend.offset;
+  if (spend.period === "day") { const d = new Date(t); d.setDate(d.getDate() + o); return [d, d]; }
+  if (spend.period === "week") { const a = weekStart(t); a.setDate(a.getDate() + 7 * o); const b = new Date(a); b.setDate(a.getDate() + 6); return [a, b]; }
+  if (spend.period === "month") { const a = new Date(t.getFullYear(), t.getMonth() + o, 1); return [a, new Date(a.getFullYear(), a.getMonth() + 1, 0)]; }
+  const y = t.getFullYear() + o; return [new Date(y, 0, 1), new Date(y, 11, 31)];
+}
+
+function spendLabel([a, b]) {
+  const o = spend.offset;
+  if (spend.period === "day") return o === 0 ? "Today" : o === -1 ? "Yesterday" : a.toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  if (spend.period === "week") return o === 0 ? "This week" : `${a.getDate()} ${MON[a.getMonth()]} – ${b.getDate()} ${MON[b.getMonth()]}${b.getFullYear() !== new Date().getFullYear() ? " " + b.getFullYear() : ""}`;
+  if (spend.period === "month") return `${a.toLocaleDateString("en-SG", { month: "long" })} ${a.getFullYear()}`;
+  return String(a.getFullYear());
+}
+
+async function runSpending() {
+  const out = $("#spendOut");
+  if (!out) return;
+  const range = spendRange();
+  const [a, b] = range;
+  $("#spendLabel").textContent = spendLabel(range);
+  $("#spendNext").disabled = spend.offset >= 0;
+  out.innerHTML = '<div class="spinner"></div>';
+  let days;
+  try { days = await loadRange(ymd(a), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your spending. Check your connection.</p>'; return; }
+  if (!$("#spendOut")) return;
+  const all = [];
+  let unpriced = 0;
+  for (const [date, d] of days) for (const m of MEALS) for (const e of d[m.id] || []) {
+    if (hasPrice(e)) all.push({ date, meal: m.id, e, price: num(e.price), type: spendType(e) });
+    else unpriced++;
+  }
+  const items = spend.filter === "all" ? all : all.filter((x) => x.type === spend.filter);
+  const total = items.reduce((s, x) => s + x.price, 0);
+
+  // Chart buckets
+  let buckets;
+  if (spend.period === "day") buckets = MEALS.map((m) => ({ label: m.name, key: m.id, match: (x) => x.meal === m.id }));
+  else if (spend.period === "year") buckets = MON.map((label, i) => ({ label: label.charAt(0), title: label, key: i, match: (x) => +x.date.slice(5, 7) === i + 1 }));
+  else {
+    buckets = [];
+    for (let d = new Date(a); d <= b; d.setDate(d.getDate() + 1)) {
+      const key = ymd(d), n = d.getDate();
+      buckets.push({ label: spend.period === "week" ? ["S", "M", "T", "W", "T", "F", "S"][d.getDay()] : (n === 1 || n % 5 === 0 ? String(n) : ""), title: prettyDate(key), key, match: (x) => x.date === key });
+    }
+  }
+  const sums = buckets.map((bk) => items.filter(bk.match).reduce((s, x) => s + x.price, 0));
+  const max = Math.max(...sums, 0.01);
+  const today = todayKey(), curMonth = new Date().getMonth();
+  const isCur = (bk) => (spend.period === "year" ? spend.offset === 0 && bk.key === curMonth : bk.key === today);
+  const filterColor = spend.filter === "all" ? "" : SPEND_TYPES.find((t) => t.id === spend.filter).color;
+  const per = { week: ["day", 7], month: ["day", buckets.length], year: ["month", 12] }[spend.period];
+
+  // Breakdown by type (always across all types, so the filter shows its share)
+  const byType = SPEND_TYPES.map((t) => ({ ...t, v: all.filter((x) => x.type === t.id).reduce((s, x) => s + x.price, 0), n: all.filter((x) => x.type === t.id).length })).filter((t) => t.v > 0).sort((p, q) => q.v - p.v);
+  const allTotal = byType.reduce((s, t) => s + t.v, 0);
+
+  // Top foods
+  const foods = new Map();
+  for (const x of items) { const k = x.e.name; const f = foods.get(k) || { name: k, v: 0, n: 0, type: x.type }; f.v += x.price; f.n++; foods.set(k, f); }
+  const top = [...foods.values()].sort((p, q) => q.v - p.v).slice(0, 8);
+
+  $("#spendTotal").textContent = money(total);
+  $("#spendSub").textContent = `${spend.filter === "all" ? "" : spendTypeName(spend.filter) + " · "}${items.length} item${items.length === 1 ? "" : "s"} with a price`;
+  out.innerHTML = !all.length
+    ? `<p class="muted">No prices logged ${spend.period === "day" ? "on this day" : "in this period"}. Add a price when you log food, or tap a logged food to add one.</p>`
+    : `
+    <div class="card-box">
+      <div class="box-head"><span>${spend.period === "day" ? "By meal" : spend.period === "year" ? "By month" : "By day"}</span>${per ? `<small>avg ${money(total / per[1])} per ${per[0]}</small>` : ""}</div>
+      <div class="spend-chart">${buckets.map((bk, i) => `<div class="col${isCur(bk) ? " cur" : ""}" title="${esc(bk.title || bk.label)}: ${money(sums[i])}"><i style="height:${sums[i] ? Math.max(3, (sums[i] / max) * 100) : 0}%;${filterColor ? "background:" + filterColor : ""}"></i><span>${esc(bk.label)}</span></div>`).join("")}</div>
+    </div>
+    <div class="card-box">
+      <div class="box-head"><span>By type of food</span><small>tap to filter</small></div>
+      <div class="type-stack">${byType.map((t) => `<i style="flex:${t.v};background:${t.color};opacity:${spend.filter === "all" || spend.filter === t.id ? 1 : 0.25}"></i>`).join("")}</div>
+      <div class="type-list">${byType.map((t) => `<button data-type="${t.id}" class="${spend.filter !== "all" && spend.filter !== t.id ? "dim" : ""}">
+        <span class="tn"><i style="background:${t.color}"></i>${esc(t.name)}</span><span class="tv">${money(t.v)}</span>
+        <span class="tt"><i style="width:${(t.v / allTotal) * 100}%;background:${t.color}"></i></span>
+        <span class="ts">${Math.round((t.v / allTotal) * 100)}% · ${t.n} item${t.n === 1 ? "" : "s"}</span></button>`).join("")}</div>
+    </div>
+    <div class="section-label">Top spends</div>
+    ${top.length ? `<ul class="top-foods">${top.map((f) => `<li><span>${esc(f.name)}${f.n > 1 ? ` <small>× ${f.n}</small>` : ""}</span><span>${money(f.v)}</span></li>`).join("")}</ul>` : '<p class="muted">Nothing of this type in this period.</p>'}
+    ${unpriced ? `<p class="note">${unpriced} logged item${unpriced === 1 ? "" : "s"} in this period ha${unpriced === 1 ? "s" : "ve"} no price and ${unpriced === 1 ? "isn't" : "aren't"} counted. Tap a food on the main screen to add its price.</p>` : ""}
+    <p class="note">The type of food is guessed from where the food comes from. To change it, tap the food on the main screen and pick a different type.</p>`;
+}
+
 // ---------- Views (bottom sheet) ----------
 const VIEWS = {
   add(body) {
@@ -1005,14 +1164,17 @@ const VIEWS = {
         <div class="field"><label for="qaC">Carbs g (optional)</label><input id="qaC" type="number" inputmode="decimal" min="0" step="any"></div>
         <div class="field"><label for="qaF">Fat g (optional)</label><input id="qaF" type="number" inputmode="decimal" min="0" step="any"></div>
         <div class="field"><label for="qaS">Sugar g (optional)</label><input id="qaS" type="number" inputmode="decimal" min="0" step="any"></div>
+        ${priceField("qaPrice")}
       </div>
       <button class="primary" id="qaAdd">Add to ${mealName(sheet.meal)}</button>`;
     setTimeout(() => $("#qaKcal")?.focus(), 250);
     $("#qaAdd", body).addEventListener("click", () => {
       const v = (id) => $("#" + id, body).value.trim();
       if (v("qaKcal") === "" || num(v("qaKcal")) <= 0) return toast("Enter the calories");
+      const price = readPrice(v("qaPrice"));
+      if (price === undefined) return toast("Check the price");
       addEntry(sheet.meal, { name: v("qaName") || "Quick add", serving: "1 serving", category: "Quick add", source: "Your entry", tier: "u",
-        kcal: v("qaKcal"), protein: v("qaP"), carbs: v("qaC"), fat: v("qaF"), sugar: v("qaS") === "" ? null : v("qaS"), sodium: null }, 1);
+        kcal: v("qaKcal"), protein: v("qaP"), carbs: v("qaC"), fat: v("qaF"), sugar: v("qaS") === "" ? null : v("qaS"), sodium: null }, 1, price);
       closeSheet();
       toast(`Added to ${mealName(sheet.meal)}`);
     });
@@ -1084,6 +1246,7 @@ const VIEWS = {
             <button data-step="0.5" aria-label="More servings">+</button>
           </div>
         </div>
+        <div style="margin-top:12px">${priceField("dPrice")}</div>
         <button class="primary" id="addBtn">Add to ${mealName(sheet.meal)}</button>
       </div>
       ${tier === "e" ? `<p class="note">There's no official nutrition data for this item, so these numbers are an estimate. You can change them after logging by tapping the entry.</p>` : ""}
@@ -1116,7 +1279,9 @@ const VIEWS = {
     $("#addBtn", body).addEventListener("click", () => {
       const m = mult();
       if (!(m > 0)) return toast("Enter how much you had");
-      addEntry(sheet.meal, food, m);
+      const price = readPrice($("#dPrice", body).value);
+      if (price === undefined) return toast("Check the price");
+      addEntry(sheet.meal, food, m, price);
       closeSheet();
       toast(`Added to ${mealName(sheet.meal)}`);
     });
@@ -1142,6 +1307,8 @@ const VIEWS = {
         ${f("eF", "Fat (g)", e.fat)}
         ${f("eS", "Sugar (g)", e.sugar)}
         ${f("eNa", "Sodium (mg)", e.sodium)}
+        ${priceField("ePrice", hasPrice(e) ? num(e.price).toFixed(2) : "")}
+        <div class="field"><label for="eType">Type of food</label><select id="eType" class="sel">${SPEND_TYPES.map((t) => `<option value="${t.id}"${t.id === spendType(e) ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>
       </div>
       <p class="note">${esc(TIER_LABEL[e.tier] || "")}${e.source ? " · " + esc(e.source) : ""}. Changing the numbers marks this entry as edited by you.</p>
       <button class="primary" id="eSave">Save changes</button>
@@ -1154,6 +1321,12 @@ const VIEWS = {
     };
     $("#eSave", body).addEventListener("click", () => {
       const nv = vals();
+      const price = readPrice($("#ePrice", body).value);
+      if (price === undefined) return toast("Check the price");
+      nv.price = price;
+      const type = $("#eType", body).value;
+      const guessed = spendType({ ...e, ptype: undefined });
+      nv.ptype = type === guessed ? null : type;
       const changed = ["kcal", "protein", "carbs", "fat", "sugar", "sodium"].some((k) => (nv[k] ?? null) !== (e[k] ?? null));
       if (changed) nv.tier = "u";
       saveEditedEntry(mealId, sheet.meal, id, nv).then(() => toast("Saved")).catch(() => {});
@@ -1209,6 +1382,7 @@ const VIEWS = {
         ${f("cFat", "Fat (g)", prefill.fat)}
         ${f("cSugar", "Sugar (g)", prefill.sugar)}
         ${f("cSodium", "Sodium (mg)", prefill.sodium)}
+        ${priceField("cPrice")}
       </div>
       ${prefill.barcode ? `<p class="note">Barcode ${esc(prefill.barcode)} will be linked to this food.</p>` : ""}
       <label class="check"><input type="checkbox" id="cSave" checked${prefill.barcode ? " disabled" : ""}> Save to My foods for next time</label>
@@ -1218,16 +1392,50 @@ const VIEWS = {
       const name = v("cName");
       if (!name) return toast("Give the food a name");
       if (v("cKcal") === "") return toast("Enter the calories");
+      const price = readPrice(v("cPrice"));
+      if (price === undefined) return toast("Check the price");
       const food = compactFood({ name, serving: v("cServing") || "1 serving", category: "My foods", source: "My foods", tier: "u", barcode: prefill.barcode,
         kcal: v("cKcal"), protein: v("cProtein"), carbs: v("cCarbs"), fat: v("cFat"), sugar: v("cSugar"), sodium: v("cSodium") });
       if ($("#cSave", body).checked) {
         const customFoods = [food, ...(state.profile?.customFoods || []).filter((c) => c.name.toLowerCase() !== name.toLowerCase() && (!food.barcode || c.barcode !== food.barcode))].slice(0, 300);
         updateProfile({ customFoods }).catch(() => {});
       }
-      addEntry(sheet.meal, food, 1);
+      addEntry(sheet.meal, food, 1, price);
       closeSheet();
       toast(`Added to ${mealName(sheet.meal)}`);
     });
+  },
+
+  spending(body) {
+    $("#sheetTitle").textContent = "Spending";
+    renderMealTabs(false);
+    spend.offset = 0;
+    body.innerHTML = `
+      <div class="seg" id="spendPeriod">${PERIODS.map(([k, l]) => `<button data-period="${k}" class="${k === spend.period ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="spend-hero">
+        <div class="spend-nav"><button id="spendPrev" aria-label="Previous">‹</button><span id="spendLabel"></span><button id="spendNext" aria-label="Next">›</button></div>
+        <div class="spend-total" id="spendTotal">$0.00</div>
+        <div class="spend-sub" id="spendSub"></div>
+      </div>
+      <div class="chips" id="spendFilter">${[{ id: "all", name: "All" }, ...SPEND_TYPES].map((t) => `<button data-type="${t.id}" class="${t.id === spend.filter ? "on" : ""}">${esc(t.name)}</button>`).join("")}</div>
+      <div id="spendOut"></div>`;
+    const setFilter = (id) => {
+      spend.filter = spend.filter === id && id !== "all" ? "all" : id;
+      body.querySelectorAll("#spendFilter button").forEach((x) => x.classList.toggle("on", x.dataset.type === spend.filter));
+      runSpending();
+    };
+    $("#spendPeriod", body).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-period]");
+      if (!b) return;
+      spend.period = b.dataset.period; spend.offset = 0;
+      body.querySelectorAll("#spendPeriod button").forEach((x) => x.classList.toggle("on", x === b));
+      runSpending();
+    });
+    $("#spendPrev", body).addEventListener("click", () => { spend.offset--; runSpending(); });
+    $("#spendNext", body).addEventListener("click", () => { if (spend.offset < 0) { spend.offset++; runSpending(); } });
+    $("#spendFilter", body).addEventListener("click", (e) => { const b = e.target.closest("[data-type]"); if (b) setFilter(b.dataset.type); });
+    $("#spendOut", body).addEventListener("click", (e) => { const b = e.target.closest("[data-type]"); if (b) setFilter(b.dataset.type); });
+    runSpending();
   },
 
   history(body) {
@@ -1275,6 +1483,8 @@ const VIEWS = {
         <button class="secondary" data-act="edit-username">Change username</button>
         <button class="secondary" data-act="edit-email">Change email</button>
       </div>
+      <div class="section-label">Colour theme</div>
+      <div class="schemes" id="schemes">${SCHEMES.map((c) => `<button data-scheme="${c.id}" class="${c.id === currentScheme() ? "on" : ""}" aria-pressed="${c.id === currentScheme()}"><i style="background:linear-gradient(135deg, ${c.swatch[0]}, ${c.swatch[1]})"></i>${c.name}</button>`).join("")}</div>
       <div class="section-label">Daily goals</div>
       <div class="form">
         ${f("gKcal", "Calories (kcal)", g.kcal)}
@@ -1309,6 +1519,13 @@ const VIEWS = {
       const v = (id) => num($("#" + id, body).value);
       const goalsNew = { kcal: v("gKcal") || 1800, protein: v("gProtein"), carbs: v("gCarbs"), fat: v("gFat"), sugar: v("gSugar"), sodium: v("gSodium") };
       try { await updateProfile({ goals: goalsNew }); renderAll(); closeSheet(); toast("Goals saved"); } catch { /* toast shown */ }
+    });
+    $("#schemes", body).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-scheme]");
+      if (!b) return;
+      applyScheme(b.dataset.scheme);
+      body.querySelectorAll("#schemes button").forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", x === b); });
+      updateProfile({ scheme: b.dataset.scheme }).catch(() => {});
     });
     $("#photoPick", body).addEventListener("click", () => $("#photoFile", body).click());
     $("#photoFile", body).addEventListener("change", async (e) => {
@@ -1668,6 +1885,7 @@ function bindEvents() {
   $("#fabScan").addEventListener("click", () => openSheet(null, "scan"));
   $("#fabManual").addEventListener("click", () => openSheet(null, "add"));
   $("#fabHistory").addEventListener("click", () => openSheet(null, "history"));
+  $("#fabSpend").addEventListener("click", () => openSheet(null, "spending"));
   $("#photoInput").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     e.target.value = ""; // drop the reference to the photo
@@ -1960,14 +2178,14 @@ async function allMonths() {
 async function exportCsv() {
   const months = await allMonths();
   const cell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const rows = [["Date", "Meal", "Food", "Serving", "Servings", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)", "Sugar (g)", "Sodium (mg)", "Source"]];
+  const rows = [["Date", "Meal", "Food", "Serving", "Servings", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)", "Sugar (g)", "Sodium (mg)", "Price paid ($)", "Type of food", "Source"]];
   for (const [, m] of months) {
     for (const date of Object.keys(m.days || {}).sort()) {
       const d = m.days[date] || {};
       for (const meal of MEALS) for (const e of d[meal.id] || []) {
         const q = num(e.qty) || 1;
         const opt = (v, f) => (v == null ? "" : f(num(v) * q));
-        rows.push([date, meal.name, e.name, e.serving, r1(q), r0(num(e.kcal) * q), r1(num(e.protein) * q), r1(num(e.carbs) * q), r1(num(e.fat) * q), opt(e.sugar, r1), opt(e.sodium, r0), e.source]);
+        rows.push([date, meal.name, e.name, e.serving, r1(q), r0(num(e.kcal) * q), r1(num(e.protein) * q), r1(num(e.carbs) * q), r1(num(e.fat) * q), opt(e.sugar, r1), opt(e.sodium, r0), hasPrice(e) ? num(e.price).toFixed(2) : "", spendTypeName(spendType(e)), e.source]);
       }
     }
   }

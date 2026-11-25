@@ -12,10 +12,13 @@ A free calorie tracker for food eaten in Singapore. It runs in any phone browser
 - Progress bars for Calories, Protein, Carbs, Fat and Sugar; week date strip; jump to any date in the last 10 years
 - 4 optional meals: Breakfast, Lunch, Dinner, Supper
 - **Scan:** live barcode scanning on the phone. The camera image is never saved or uploaded; only the barcode number is looked up. Unknown products can be entered once and are recognised on the next scan.
-- **Food search:** about 3,000 foods with official data (HPB's SG FoodID for hawker and everyday food, McDonald's Singapore, Ya Kun drinks), packaged products from Open Food Facts, and labelled estimates for chains that publish nothing. Understands local names ("cai fan", "kopi siew dai", "CKT") and small typos.
+- **Food search:** about 3,000 foods with official data (HPB's SG FoodID for hawker and everyday food, McDonald's, KFC, Subway and 7-Eleven Singapore, Ya Kun drinks), packaged products from Open Food Facts, and labelled estimates for chains that publish nothing. Understands local names ("cai fan", "kopi siew dai", "CKT") and small typos.
 - **Faster logging:** quick add (just calories), portion sizes (small / regular / large / grams), favourites, recent foods, "same as yesterday's lunch", and copying a whole day
 - **Edit entries:** tap any logged food to change its numbers, servings or meal
 - **Picks:** local dishes and low-sugar drinks that fit the calories left today
+- **Prices (optional):** type what you paid when logging, or later by tapping the entry. Nothing is filled in automatically. Prices show on each food, each meal and the day.
+- **Spending tab:** totals for a day, week, month or year, a chart, a breakdown by type of food (fast food, hawker, bubble tea and drinks, café, convenience store, groceries, other) with a filter, and top spends. The type is guessed from where the food comes from and can be changed per entry.
+- **Colour theme:** Purple, Baby pink or Baby blue (Profile → Colour theme), saved to the account
 - **History:** search past foods (e.g. "bubble tea") over 7 days, 30 days, this month, this year or all time, or see daily totals and the most-eaten foods
 - **Profile:** edit daily goals; change username (instant) or email (confirmed by a link sent to the new address); reset password; sign out
 - **Notifications** (optional, per person): every 1–4 hours within chosen hours, meal reminders if a meal isn't logged by a set time, and an end-of-day reminder if nothing was logged. Sent hourly by a free GitHub Actions job.

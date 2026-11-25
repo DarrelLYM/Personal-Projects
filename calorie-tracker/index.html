@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-scheme="purple">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Grace's Calorie Tracker</title>
 <meta name="theme-color" content="#4c1fd6">
+<script>try { var s = localStorage.getItem("gct-scheme"); if (s === "pink" || s === "blue") { document.documentElement.dataset.scheme = s; document.querySelector('meta[name="theme-color"]').content = s === "pink" ? "#e0629a" : "#3f8fdb"; } } catch (e) {}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,31 +17,50 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
 <style>
   /* Layout: gradient header band (date strip + nutrient bars) over a lavender list of four meals, with a floating Scan / Manual / History bar. */
+  /* Three colour schemes (Profile -> Colour theme): purple (default), baby pink and baby blue.
+     Variable names keep "purple" for history; they hold the active scheme's accent. --glow is an "r,g,b" triplet for tinted shadows. */
+  :root, :root[data-scheme="purple"] {
+    --purple: #6a3cf0; --purple-2: #8b5cf6; --purple-deep: #4c1fd6; --orb: #8f6bff;
+    --hero-1: #4c1fd6; --hero-2: #6a3cf0; --hero-3: #8b5cf6; --hero-text-shadow: none; --auth-2: #6a3cf0;
+    --ink: #1d1638; --ink-2: #5d5677; --ink-3: #847d9e; --card: #ffffff; --bg: #f1eefb;
+    --soft: rgba(106,60,240,.10); --line: rgba(106,60,240,.14); --glow: 76,31,214;
+    --hero-fade: rgba(241,238,251,0); --scrim: rgba(20,10,50,.45);
+  }
+  :root[data-scheme="pink"] {
+    --purple: #d6457f; --purple-2: #f29bbf; --purple-deep: #c2336e; --orb: #f59bbf;
+    --hero-1: #dc5a94; --hero-2: #e978a8; --hero-3: #f095bd; --hero-text-shadow: 0 1px 2px rgba(140,30,75,.28); --auth-2: #f29bbf;
+    --ink: #3b1a2b; --ink-2: #6f4a5b; --ink-3: #9a7586; --card: #ffffff; --bg: #fff0f5;
+    --soft: rgba(214,69,127,.10); --line: rgba(214,69,127,.14); --glow: 194,51,110;
+    --hero-fade: rgba(255,240,245,0); --scrim: rgba(50,10,30,.45);
+  }
+  :root[data-scheme="blue"] {
+    --purple: #2b78cc; --purple-2: #6fb3ee; --purple-deep: #1f63b3; --orb: #7cc0f5;
+    --hero-1: #3786d6; --hero-2: #5ba3e4; --hero-3: #82bdee; --hero-text-shadow: 0 1px 2px rgba(20,70,130,.28); --auth-2: #6fb3ee;
+    --ink: #14283d; --ink-2: #4a5f75; --ink-3: #7a8ea3; --card: #ffffff; --bg: #eef6fd;
+    --soft: rgba(43,120,204,.10); --line: rgba(43,120,204,.14); --glow: 31,99,179;
+    --hero-fade: rgba(238,246,253,0); --scrim: rgba(10,25,45,.45);
+  }
   :root {
-    --purple: #6a3cf0;
-    --purple-2: #8b5cf6;
-    --purple-deep: #4c1fd6;
-    --ink: #1d1638;
-    --ink-2: #5d5677;
-    --ink-3: #847d9e;
-    --card: #ffffff;
-    --bg: #f1eefb;
-    --soft: rgba(106,60,240,.10);
-    --line: rgba(106,60,240,.14);
     --track: rgba(255,255,255,.75);
     --over: #e5484d;
-    --shadow: 0 6px 24px rgba(76, 31, 214, .12);
-    --hero-fade: rgba(241,238,251,0);
+    --shadow: 0 6px 24px rgba(var(--glow),.12);
     --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     --font-display: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --ink: #f2efff; --ink-2: #c9c2e6; --ink-3: #9a93b8;
-      --card: #231d3c; --bg: #15112a; --soft: rgba(160,130,255,.16); --line: rgba(160,130,255,.2);
-      --track: rgba(255,255,255,.2); --shadow: 0 6px 24px rgba(0,0,0,.35); --hero-fade: rgba(21,17,42,0);
-      color-scheme: dark;
+    :root { --track: rgba(255,255,255,.2); --shadow: 0 6px 24px rgba(0,0,0,.35); color-scheme: dark; }
+    :root, :root[data-scheme="purple"] {
+      --ink: #f2efff; --ink-2: #c9c2e6; --ink-3: #9a93b8; --card: #231d3c; --bg: #15112a;
+      --soft: rgba(160,130,255,.16); --line: rgba(160,130,255,.2); --hero-fade: rgba(21,17,42,0);
+    }
+    :root[data-scheme="pink"] {
+      --ink: #fff0f6; --ink-2: #ecc7d7; --ink-3: #bf97a9; --card: #3a2030; --bg: #231420;
+      --soft: rgba(255,150,195,.16); --line: rgba(255,150,195,.2); --hero-fade: rgba(35,20,32,0);
+    }
+    :root[data-scheme="blue"] {
+      --ink: #eef6ff; --ink-2: #c3d6ea; --ink-3: #8fa6bd; --card: #1b2a3c; --bg: #0f1a27;
+      --soft: rgba(130,190,255,.16); --line: rgba(130,190,255,.2); --hero-fade: rgba(15,26,39,0);
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -53,7 +73,7 @@
   .wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
   /* ---------- Sign-in screens ---------- */
-  .auth { min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(180deg, var(--purple-deep) 0%, var(--purple) 30%, var(--bg) 62%); }
+  .auth { min-height: 100vh; display: flex; flex-direction: column; background: linear-gradient(180deg, var(--purple-deep) 0%, var(--auth-2) 30%, var(--bg) 62%); }
   .auth .wrap { width: 100%; padding-top: calc(env(safe-area-inset-top, 0px) + 56px); padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px); }
   .auth-brand { color: #fff; text-align: center; margin-bottom: 28px; }
   .auth-brand .logo { width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 14px; display: block; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
@@ -71,7 +91,7 @@
   .setup { max-width: 520px; margin: 0 auto; line-height: 1.6; color: var(--ink-2); }
 
   /* ---------- Header band ---------- */
-  .hero { background: linear-gradient(180deg, var(--purple-deep) 0%, var(--purple) 38%, var(--purple-2) 72%, var(--hero-fade) 100%); padding-top: calc(env(safe-area-inset-top, 0px) + 12px); padding-bottom: 26px; color: #fff; }
+  .hero { background: linear-gradient(180deg, var(--hero-1) 0%, var(--hero-2) 38%, var(--hero-3) 72%, var(--hero-fade) 100%); text-shadow: var(--hero-text-shadow); padding-top: calc(env(safe-area-inset-top, 0px) + 12px); padding-bottom: 26px; color: #fff; }
   .topbar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
   .brand { text-align: center; min-width: 0; }
   .brand .app { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; opacity: .85; font-weight: 600; }
@@ -82,7 +102,7 @@
   .icon-btn.has-photo { background-size: cover; background-position: center; }
   .icon-btn.has-photo .initial { visibility: hidden; }
   .photo-row { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
-  .avatar-lg { width: 76px; height: 76px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 30px; background: radial-gradient(circle at 30% 30%, #8f6bff, var(--purple-deep)); background-size: cover; background-position: center; box-shadow: var(--shadow); }
+  .avatar-lg { width: 76px; height: 76px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 30px; background: radial-gradient(circle at 30% 30%, var(--orb), var(--purple-deep)); background-size: cover; background-position: center; box-shadow: var(--shadow); }
   .photo-btns { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
   .icon-btn .initial { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
   .date-jump { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
@@ -115,7 +135,7 @@
   .meal-title h2 { margin: 0; font-size: 19px; font-weight: 600; }
   .meal-title .sub { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
   .tag-now { font-size: 11px; font-weight: 600; vertical-align: middle; margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--purple); }
-  .add-btn { width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 30% 30%, #8f6bff, var(--purple-deep)); box-shadow: 0 6px 16px rgba(76,31,214,.35); }
+  .add-btn { width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 30% 30%, var(--orb), var(--purple-deep)); box-shadow: 0 6px 16px rgba(var(--glow),.35); }
   .add-btn svg { width: 22px; height: 22px; }
   .entries { list-style: none; margin: 10px 0 4px; padding: 0; display: grid; gap: 8px; }
   .entry { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow); }
@@ -149,14 +169,14 @@
   .summary .v { font-size: 17px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .summary .v small { font-size: 12px; color: var(--ink-3); font-weight: 400; }
 
-  .fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); display: flex; gap: 6px; padding: 6px; border-radius: 99px; background: var(--card); box-shadow: 0 10px 30px rgba(76,31,214,.28); z-index: 20; }
+  .fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); display: flex; gap: 6px; padding: 6px; border-radius: 99px; background: var(--card); box-shadow: 0 10px 30px rgba(var(--glow),.28); z-index: 20; }
   .fab button { display: flex; align-items: center; gap: 6px; padding: 12px 16px; border-radius: 99px; font-weight: 600; font-size: 15px; white-space: nowrap; }
   .fab .scan { background: var(--purple); color: #fff; }
   .fab .manual, .fab .hist { background: var(--soft); color: var(--purple); }
   .fab svg { width: 19px; height: 19px; }
 
   /* ---------- Bottom sheet ---------- */
-  .scrim { position: fixed; inset: 0; background: rgba(20,10,50,.45); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
+  .scrim { position: fixed; inset: 0; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
   .scrim.open { opacity: 1; pointer-events: auto; }
   .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-width: 640px; margin: 0 auto; background: var(--bg); border-radius: 24px 24px 0 0; height: 92vh; display: flex; flex-direction: column; transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1); padding-bottom: env(safe-area-inset-bottom, 0px); }
   .sheet.open { transform: translateY(0); }
@@ -297,10 +317,56 @@
   .top-foods li { display: flex; justify-content: space-between; gap: 10px; background: var(--card); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
   .top-foods li span:last-child { color: var(--ink-3); white-space: nowrap; }
 
+  .schemes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .schemes button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px; border-radius: 14px; background: var(--card); border: 2px solid transparent; font-size: 13px; font-weight: 600; color: var(--ink-2); box-shadow: var(--shadow); }
+  .schemes button.on { border-color: var(--purple); color: var(--ink); }
+  .schemes i { width: 36px; height: 36px; border-radius: 50%; display: block; }
+  /* ---------- Prices & spending ---------- */
+  .e-right { text-align: right; flex: none; }
+  .e-price { font-size: 12px; font-weight: 600; color: #0e8a45; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .spent-line { margin-top: 12px; font-size: 13px; text-align: center; color: #fff; }
+  .spent-line b { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .money-in { display: flex; align-items: center; border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding-left: 12px; }
+  .money-in span { color: var(--ink-3); font-weight: 600; font-size: 16px; }
+  .money-in input { border: 0 !important; padding-left: 6px !important; background: transparent !important; }
+  .money-in:focus-within { border-color: var(--purple); }
+  .price-field { grid-column: 1 / -1; }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--soft); border-radius: 14px; padding: 3px; }
+  .seg button { padding: 9px 0; border-radius: 11px; font-weight: 600; font-size: 14px; color: var(--purple); }
+  .seg button.on { background: var(--purple); color: #fff; }
+  .spend-hero { text-align: center; margin: 14px 0 4px; }
+  .spend-nav { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--ink-2); font-weight: 600; }
+  .spend-nav button { width: 36px; height: 36px; border-radius: 50%; font-size: 22px; line-height: 1; color: var(--purple); }
+  .spend-nav button:disabled { opacity: .3; }
+  .spend-total { font-family: var(--font-display); font-size: 36px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .spend-sub { font-size: 13px; color: var(--ink-3); }
+  .card-box { background: var(--card); border-radius: 16px; padding: 14px; margin-top: 12px; box-shadow: var(--shadow); }
+  .box-head { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; margin-bottom: 10px; }
+  .box-head small { color: var(--ink-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .spend-chart { display: flex; align-items: stretch; gap: 3px; height: 120px; }
+  .spend-chart .col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+  .spend-chart .col i { display: block; width: 100%; max-width: 28px; background: var(--purple-2); border-radius: 5px 5px 2px 2px; }
+  .spend-chart .col.cur i { background: var(--purple); }
+  .spend-chart .col span { font-size: 10px; color: var(--ink-3); height: 12px; white-space: nowrap; }
+  .type-stack { display: flex; gap: 2px; height: 12px; border-radius: 99px; overflow: hidden; margin-bottom: 12px; }
+  .type-list { display: grid; gap: 10px; }
+  .type-list button { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; text-align: left; align-items: center; }
+  .type-list button.dim { opacity: .45; }
+  .type-list .tn { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .type-list .tn i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .type-list .tv { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .type-list .tt { grid-column: 1 / -1; height: 7px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+  .type-list .tt i { display: block; height: 100%; border-radius: 99px; }
+  .type-list .ts { grid-column: 1 / -1; font-size: 11px; color: var(--ink-3); }
+  .top-foods small { color: var(--ink-3); }
+  @media (max-width: 460px) {
+    .fab { gap: 4px; }
+    .fab button { flex-direction: column; gap: 2px; padding: 8px 14px; font-size: 11.5px; border-radius: 22px; }
+  }
+
   .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; transition: opacity .25s, transform .25s; z-index: 50; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   @media (max-width: 380px) {
-    .fab button { padding: 12px 12px; font-size: 14px; }
     .bar .lbl { font-size: 10px; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -341,6 +407,7 @@
         <button class="week-nav" id="nextWeek" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
       <div class="bars" id="bars"></div>
+      <div class="spent-line" id="spentLine" hidden></div>
       <div class="banner" id="banner" hidden></div>
     </div>
   </header>
@@ -355,6 +422,7 @@
     <button class="scan" id="fabScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 9v6M10 9v6M13 9v6M16 9v6"/></svg>Scan</button>
     <button class="manual" id="fabManual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Manual</button>
     <button class="hist" id="fabHistory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History</button>
+    <button class="hist" id="fabSpend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M6.5 15h3"/></svg>Spending</button>
   </div>
 </div>
 
