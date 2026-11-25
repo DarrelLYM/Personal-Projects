@@ -7,6 +7,8 @@ Sources (each food keeps a tier and a source label):
   yakun-drinks.json   Ya Kun Nutrition Information Panel (per 100ml). Official ("o").
   subway-sg.json      Subway Singapore nutrition guide (Feb 2022). Official ("o").
   kfc-sg.json         KFC Singapore Nutrition & Allergen page. Official ("o").
+  7eleven-sg.json     7-Eleven Singapore product pages (7-Select meals, 7Cafe drinks). Official ("o").
+  liho-lihoteasg.json LiHO calorie ranges from an unofficial fan site. Estimate ("e").
   estimates.json      Chains with no published data. Estimate ("e").
 
 Run:  python3 scripts/foods/build.py
@@ -203,6 +205,52 @@ for x in kfc["items"]:
     items.append(rec)
 counts["kfc"] = len(kfc["items"])
 
+# ---------- 7-Eleven Singapore ----------
+se = load("7eleven-sg.json")
+for x in se["items"]:
+    sub, name = x["sub"], x["name"].strip()
+    drink = sub == "7Café"
+    if drink:
+        unit, w, kind = f"1 cup ({x['ml']}ml)", x["ml"], "drink"
+        note = "7Café; site lists per 100ml, converted to cup size"
+    else:
+        g = x.get("grams")
+        unit, w = (f"1 pack ({'%g' % g}g)" if g else "1 pack"), g
+        kind = "meal" if sub in ("Delectable Meals", "Burgers", "Wraps", "Sandwiches") else "snack"
+        note = "7-Select " + sub
+    rec = {"i": "7e-" + re.sub(r"[^a-z0-9]+", "-", (sub + " " + name).lower()).strip("-"), "n": name if name.startswith("7-") else ("7-Eleven " + name if drink else name),
+           "b": "7-Eleven", "c": "Drinks" if drink else "Restaurants", "g": "7-Eleven", "d": "7-eleven seven eleven 711 " + sub.lower(),
+           "s": unit, "w": w, "k": r0(num(x["kcal"])), "p": r1(num(x["protein"])), "cb": r1(num(x["carbs"])), "f": r1(num(x["fat"])),
+           "su": r1(num(x.get("sugar"))), "na": r0(num(x.get("sodium"))), "t": "o", "src": "7e", "sn": note, "kd": kind}
+    if rec["k"] is None:
+        continue
+    if re.search(r"egg|omelette|sausage", name, re.I) and sub in ("Burgers", "Wraps", "Sandwiches"):
+        rec["bf"] = 1
+    items.append(rec)
+counts["7e"] = len(se["items"])
+
+# ---------- LiHO (unofficial ranges -> estimate, midpoint) ----------
+li = load("liho-lihoteasg.json")
+n_li = 0
+for x in li["items"]:
+    rg = x["range"].lower()
+    if "zero" in rg:
+        lo = hi = 0
+    elif rg.startswith("under"):
+        lo, hi = 0, int(re.search(r"\d+", rg).group())
+    else:
+        lo, hi = map(int, re.findall(r"\d+", rg)[:2])
+    kcal = (lo + hi) / 2
+    topping = x["category"] == "Toppings"
+    name = "LiHO " + x["name"] + (" (topping)" if topping else "")
+    items.append({"i": "liho-" + re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-"), "n": name, "b": "LiHO", "c": "Drinks", "g": "LiHO",
+                  "d": "liho bubble tea " + x["category"].lower(), "s": ("1 serving (" + x["size"] + ")") if topping else "1 cup (regular)",
+                  "k": r0(kcal), "t": "e", "src": "liho",
+                  "sn": f"Listed as {x['range']} on lihoteasg.org (unofficial fan site, not LiHO); midpoint used. Sugar level not stated.",
+                  "kd": "snack" if topping else "drink"})
+    n_li += 1
+counts["liho"] = n_li
+
 # ---------- Estimates ----------
 est = load("estimates.json")
 for x in est:
@@ -230,6 +278,8 @@ out = {
         "yakun": {"label": "Ya Kun nutrition panel", "url": "https://app.yakun.com/nutritional-information"},
         "kfc": {"label": "KFC Singapore", "url": "https://www.kfc.com.sg/nutritionandallergen"},
         "subway": {"label": "Subway Singapore nutrition guide", "url": "https://subwayisfresh.com.sg/wp-content/uploads/2022/02/Singapore-Nutrition-Information-Webguide-Feb-2022.pdf"},
+        "7e": {"label": "7-Eleven Singapore", "url": "https://www.7-eleven.com.sg/products"},
+        "liho": {"label": "lihoteasg.org (unofficial)", "url": "https://lihoteasg.org/liho-calories/"},
         "est": {"label": "Estimate", "note": "No official data published"},
     },
     "items": items,

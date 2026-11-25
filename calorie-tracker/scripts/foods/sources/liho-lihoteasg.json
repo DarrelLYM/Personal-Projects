@@ -1,0 +1,433 @@
+{
+ "source": "lihoteasg.org/liho-calories/ (unofficial fan site, not LiHO's own); calorie ranges only",
+ "url": "https://lihoteasg.org/liho-calories/",
+ "accessed": "2026-11-25",
+ "items": [
+  {
+   "category": "Classic Milk Tea",
+   "name": "Milk Dark Tea",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Classic Milk Tea",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Classic Milk Tea with Pearl",
+   "size": "Regular",
+   "range": "250-350+ kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Gula Melaka Milk Tea",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Earl Grey Tea",
+   "size": "Regular",
+   "range": "Under 50 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Brown Sugar Milk Earl Grey Tea",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Milk Lychee Tea",
+   "size": "Regular",
+   "range": "180-280 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Milk Green Tea",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Milk Green Tea with Red Sugar Pearl",
+   "size": "Regular",
+   "range": "280-380+ kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Honey Milk Green Tea",
+   "size": "Regular",
+   "range": "180-280 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Milk Da Hong Pao Tea",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Salted Caramel Milk Da Hong Pao Tea",
+   "size": "Regular",
+   "range": "250-350+ kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Double Chocolate Milk",
+   "size": "Regular",
+   "range": "300-400+ kcal"
+  },
+  {
+   "category": "Classic Milk Tea",
+   "name": "Signature Coffee",
+   "size": "Regular",
+   "range": "100-250+ kcal"
+  },
+  {
+   "category": "Pure Tea",
+   "name": "Jasmine Green Tea",
+   "size": "Regular",
+   "range": "Zero Calorie"
+  },
+  {
+   "category": "Pure Tea",
+   "name": "Gardenia White Tea",
+   "size": "Regular",
+   "range": "Zero Calorie"
+  },
+  {
+   "category": "Pure Tea",
+   "name": "Orchid Tie Guan Yin",
+   "size": "Regular",
+   "range": "Zero Calorie"
+  },
+  {
+   "category": "Pure Tea",
+   "name": "Winter Melon Tea",
+   "size": "Regular",
+   "range": "50-150 kcal"
+  },
+  {
+   "category": "Pure Tea",
+   "name": "Roselle Hawthorn Tea",
+   "size": "Regular",
+   "range": "50-150 kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "Golden Avocado",
+   "size": "Regular",
+   "range": "250-350 kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "Red Sugar Pearl Avocado",
+   "size": "Regular",
+   "range": "350-450+ kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "Avocado Oat Milk",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "Pandan Avocado",
+   "size": "Regular",
+   "range": "250-350 kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "Calpis Avocado",
+   "size": "Regular",
+   "range": "300-400+ kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "Tropical Avocado",
+   "size": "Regular",
+   "range": "300-400 kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "CheesHO Avocado",
+   "size": "Regular",
+   "range": "350-450+ kcal"
+  },
+  {
+   "category": "LiHO Avocado Garden",
+   "name": "Pudding Avocado",
+   "size": "Regular",
+   "range": "350-450+ kcal"
+  },
+  {
+   "category": "Fresh Milk",
+   "name": "Red Sugar Pearl Lover Fresh Milk",
+   "size": "Regular",
+   "range": "300-400+ kcal"
+  },
+  {
+   "category": "Fresh Milk",
+   "name": "Cookies Red Sugar Pearl Fresh Milk",
+   "size": "Regular",
+   "range": "350-450+ kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Lychee Aloe Ha",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Lychee Rose Tie Guan Yin Tea",
+   "size": "Regular",
+   "range": "100-200 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Longan Jasmine Green Tea with White Pearl",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Triple Peach Pomelo",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Calpis Jasmine Green Tea",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Calpis Lemon",
+   "size": "Regular",
+   "range": "100-200 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Honey Green Tea",
+   "size": "Regular",
+   "range": "100-200 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Plum Green Tea",
+   "size": "Regular",
+   "range": "100-200 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Fresh Lemon Green Tea",
+   "size": "Regular",
+   "range": "50-150 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Money Money Coconut Tea",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Passion Fruit Gardenia White Tea",
+   "size": "Regular",
+   "range": "100-200 kcal"
+  },
+  {
+   "category": "Fruit Tea",
+   "name": "Fresh Lemon Aloe Vera with White Pearl",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Latte",
+   "name": "Jasmine Green Tea Latte",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Latte",
+   "name": "Orchid Tie Guan Yin Latte",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Latte",
+   "name": "Money Money Tea Latte",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Latte",
+   "name": "Gardenia White Tea Latte",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Plant Based Light Milk Tea",
+   "name": "Oat Milk Jasmine Green Tea",
+   "size": "Regular",
+   "range": "100-200 kcal"
+  },
+  {
+   "category": "Plant Based Light Milk Tea",
+   "name": "Coconut Milk Gardenia White Tea",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Plant Based Light Milk Tea",
+   "name": "Mango Oat Milk with White Jade",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Avocado Coconut Shake",
+   "size": "Regular",
+   "range": "250-350 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Signature Coconut Shake",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Lychee Rose Coconut Smoothie",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Red Bull Calamansi Smoothie",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Red Bull Lychee Rose Smoothie",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Passion Roselle Smoothie",
+   "size": "Regular",
+   "range": "150-250 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Red Bean Coconut Smoothie Mix",
+   "size": "Regular",
+   "range": "250-350 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Red Sugar Pearl Coconut Smoothie",
+   "size": "Regular",
+   "range": "300-400+ kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Mango Tango",
+   "size": "Regular",
+   "range": "200-300 kcal"
+  },
+  {
+   "category": "Smoothie",
+   "name": "Salted Caramel Coffee Frappe",
+   "size": "Regular",
+   "range": "300-400+ kcal"
+  },
+  {
+   "category": "Sparkling Water",
+   "name": "Sparkling Peach",
+   "size": "Regular",
+   "range": "50-100 kcal"
+  },
+  {
+   "category": "Sparkling Water",
+   "name": "Sparkling Lychee",
+   "size": "Regular",
+   "range": "50-100 kcal"
+  },
+  {
+   "category": "Sparkling Water",
+   "name": "Sparkling White Grape",
+   "size": "Regular",
+   "range": "50-100 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Pearl",
+   "size": "1/4 cup",
+   "range": "50-100 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Coconut Jelly",
+   "size": "1/4 cup",
+   "range": "20-50 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Ai Yu Jelly",
+   "size": "1/4 cup",
+   "range": "10-30 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Brown Sugar Pearl",
+   "size": "1/4 cup",
+   "range": "70-120 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "White Pearl",
+   "size": "1/4 cup",
+   "range": "50-100 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Aloe Vera",
+   "size": "2-3 tablespoons",
+   "range": "10-20 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Herbal Jelly",
+   "size": "1/4 cup",
+   "range": "20-40 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Pudding Jelly",
+   "size": "1/4 cup",
+   "range": "50-80 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Oreo Crunch",
+   "size": "1-2 crushed Oreo cookies",
+   "range": "50-100 kcal"
+  },
+  {
+   "category": "Toppings",
+   "name": "Cheese",
+   "size": "2-3 tablespoons of foam",
+   "range": "100-150 kcal"
+  }
+ ]
+}

@@ -385,18 +385,6 @@
  },
  {
   "brand": "7-Eleven",
-  "name": "Sandwich (egg mayo)",
-  "serving": "1 pack",
-  "kcal": 320,
-  "protein": 11,
-  "carbs": 30,
-  "fat": 18,
-  "sugar": 4,
-  "sodium": 560,
-  "note": "Rough estimate from general knowledge of typical values (written by the AI assistant that built this app), not from a published source. The chain does not publish Singapore nutrition data. Edit after logging if you know better."
- },
- {
-  "brand": "7-Eleven",
   "name": "Chicken Sausage (grilled)",
   "serving": "1 stick",
   "kcal": 150,
