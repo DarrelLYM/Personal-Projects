@@ -1,182 +1,155 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Food Log</title>
-<meta name="theme-color" content="#6a3cf0">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<title>Grace's Calorie Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
+  /* Layout: gradient header band (date strip + nutrient bars) over a lavender list of four meals, with a floating Scan / Manual / Ask bar. */
   :root {
     --purple: #6a3cf0;
     --purple-2: #8b5cf6;
     --purple-deep: #4c1fd6;
     --ink: #1d1638;
     --ink-2: #5d5677;
-    --ink-3: #8f89a8;
+    --ink-3: #847d9e;
     --card: #ffffff;
     --bg: #f1eefb;
+    --soft: rgba(106,60,240,.10);
+    --line: rgba(106,60,240,.12);
     --track: rgba(255,255,255,.75);
     --over: #e5484d;
-    --ok: #12a150;
-    --radius: 20px;
+    --good: #12a150;
     --shadow: 0 6px 24px rgba(76, 31, 214, .12);
+    --hero-fade: rgba(241,238,251,0);
+    --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    --font-display: "Space Grotesk", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --ink: #f2efff; --ink-2: #c4bde0; --ink-3: #8f89a8;
-      --card: #221c3a; --bg: #15112a; --track: rgba(255,255,255,.18);
-      --shadow: 0 6px 24px rgba(0,0,0,.35);
+      --ink: #f2efff; --ink-2: #c9c2e6; --ink-3: #9a93b8;
+      --card: #231d3c; --bg: #15112a; --soft: rgba(160,130,255,.16); --line: rgba(160,130,255,.18);
+      --track: rgba(255,255,255,.2); --shadow: 0 6px 24px rgba(0,0,0,.35); --hero-fade: rgba(21,17,42,0);
+      color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --ink: #f2efff; --ink-2: #c4bde0; --ink-3: #8f89a8;
-    --card: #221c3a; --bg: #15112a; --track: rgba(255,255,255,.18);
-    --shadow: 0 6px 24px rgba(0,0,0,.35);
+    --ink: #f2efff; --ink-2: #c9c2e6; --ink-3: #9a93b8;
+    --card: #231d3c; --bg: #15112a; --soft: rgba(160,130,255,.16); --line: rgba(160,130,255,.18);
+    --track: rgba(255,255,255,.2); --shadow: 0 6px 24px rgba(0,0,0,.35); --hero-fade: rgba(21,17,42,0);
+    color-scheme: dark;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: var(--ink);
-    background: var(--bg);
-    min-height: 100vh;
-    overflow-x: hidden;
+    font-family: var(--font); color: var(--ink); background: var(--bg);
+    min-height: 100vh; overflow-x: hidden;
   }
   button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
-  input, select { font: inherit; color: var(--ink); }
+  button:focus-visible, input:focus-visible, label:focus-within { outline: 2px solid var(--purple-2); outline-offset: 2px; }
+  input, select, textarea { font: inherit; color: var(--ink); }
+  .wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
-  /* ---------- Hero (gradient header) ---------- */
+  /* ---------- Header band ---------- */
   .hero {
-    background: linear-gradient(180deg, var(--purple-deep) 0%, var(--purple) 35%, var(--purple-2) 70%, rgba(139,92,246,0) 100%);
-    padding: calc(env(safe-area-inset-top) + 14px) 16px 26px;
+    background: linear-gradient(180deg, var(--purple-deep) 0%, var(--purple) 38%, var(--purple-2) 72%, var(--hero-fade) 100%);
+    margin-top: calc(-1 * env(safe-area-inset-top, 0px));
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding-bottom: 26px;
     color: #fff;
   }
-  .topbar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; }
-  .topbar h1 { margin: 0; text-align: center; font-size: 22px; font-weight: 600; letter-spacing: .2px; }
-  .icon-btn {
-    width: 44px; height: 44px; border-radius: 50%;
-    display: grid; place-items: center;
-    background: rgba(255,255,255,.85); color: var(--purple-deep);
-  }
+  .topbar { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
+  .brand { text-align: center; min-width: 0; }
+  .brand .app { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; opacity: .85; font-weight: 600; }
+  .brand h1 { margin: 2px 0 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-wrap: balance; }
+  .icon-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.88); color: var(--purple-deep); position: relative; overflow: hidden; }
   .icon-btn svg { width: 22px; height: 22px; }
   .icon-btn.ghost { background: transparent; color: #fff; }
+  .icon-btn .initial { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+  .date-jump { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 
-  .week { display: flex; align-items: center; gap: 2px; margin-top: 18px; }
-  .week-nav { width: 22px; height: 54px; color: rgba(255,255,255,.8); display: grid; place-items: center; flex: none; }
+  .week { display: flex; align-items: center; gap: 2px; margin-top: 16px; }
+  .week-nav { width: 22px; height: 54px; color: rgba(255,255,255,.85); display: grid; place-items: center; flex: none; }
   .week-nav svg { width: 16px; height: 16px; }
-  .days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-  .day {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 9px 0 10px; border-radius: 16px; color: rgba(255,255,255,.92);
-    position: relative;
-  }
+  .days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; min-width: 0; }
+  .day { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 9px 0 10px; border-radius: 16px; color: rgba(255,255,255,.92); position: relative; }
   .day .dow { font-size: 13px; opacity: .9; }
-  .day .dnum { font-size: 18px; font-weight: 500; }
-  .day.sel { background: rgba(255,255,255,.88); color: var(--purple-deep); }
+  .day .dnum { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .day.sel { background: rgba(255,255,255,.9); color: var(--purple-deep); }
   .day.today:not(.sel) .dnum { text-decoration: underline; text-underline-offset: 4px; }
-  .day .dot { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: #fff; opacity: .9; }
+  .day .dot { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: #fff; }
   .day.sel .dot { background: var(--purple); }
 
-  /* ---------- Progress bars (the "bar" row) ---------- */
-  .bars {
-    display: grid;
-    grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr;
-    gap: 8px; margin-top: 20px;
-  }
+  .bars { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr; gap: 8px; margin-top: 18px; }
   .bar { min-width: 0; }
   .bar .track { height: 12px; border-radius: 99px; background: var(--track); overflow: hidden; }
-  .bar .fill { height: 100%; width: 0; border-radius: 99px; background: #fff; transition: width .5s cubic-bezier(.2,.8,.2,1); }
-  .bar .fill { background: linear-gradient(90deg, #ffd36e, #ff9f43); }
+  .bar .fill { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #ffd36e, #ff9f43); transition: width .5s cubic-bezier(.2,.8,.2,1); }
   .bar.cal .fill { background: linear-gradient(90deg, #43e97b, #38f9d7); }
   .bar.over .fill { background: var(--over); }
-  .bar .lbl { margin-top: 7px; font-size: 11px; color: rgba(255,255,255,.95); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .2px; }
-  .bar .lbl b { font-weight: 600; }
-  .bar .lbl.goal { margin-top: 1px; font-size: 10.5px; color: rgba(255,255,255,.72); }
-  .bars-hint { margin-top: 10px; font-size: 12px; color: rgba(255,255,255,.85); text-align: center; }
+  .bar .lbl { margin-top: 7px; font-size: 11px; color: rgba(255,255,255,.96); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .2px; font-variant-numeric: tabular-nums; }
+  .bar .lbl.goal { margin-top: 1px; font-size: 10.5px; color: rgba(255,255,255,.75); }
 
-  /* ---------- Meals ---------- */
-  main { padding: 0 16px calc(env(safe-area-inset-bottom) + 110px); max-width: 640px; margin: 0 auto; }
-  .hero-inner { max-width: 640px; margin: 0 auto; }
-  .meal { padding: 14px 0 6px; border-bottom: 1px solid rgba(106,60,240,.10); }
+  .banner { margin-top: 12px; font-size: 12px; background: rgba(255,255,255,.18); border-radius: 12px; padding: 8px 12px; line-height: 1.4; }
+
+  /* ---------- Main ---------- */
+  main { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); }
+  .meal { padding: 14px 0 6px; border-bottom: 1px solid var(--line); }
   .meal-head { display: flex; align-items: center; gap: 12px; }
   .meal-title { flex: 1; min-width: 0; }
   .meal-title h2 { margin: 0; font-size: 19px; font-weight: 600; }
   .meal-title .sub { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
-  .meal.suggest .meal-title h2::after {
-    content: "now"; font-size: 11px; font-weight: 600; vertical-align: middle;
-    margin-left: 8px; padding: 2px 8px; border-radius: 99px;
-    background: rgba(106,60,240,.12); color: var(--purple);
-  }
-  .add-btn {
-    width: 44px; height: 44px; border-radius: 50%; flex: none;
-    display: grid; place-items: center; color: #fff;
-    background: radial-gradient(circle at 30% 30%, #8f6bff, var(--purple-deep));
-    box-shadow: 0 6px 16px rgba(76,31,214,.35);
-  }
+  .tag-now { font-size: 11px; font-weight: 600; vertical-align: middle; margin-left: 8px; padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--purple); }
+  .add-btn { width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 30% 30%, #8f6bff, var(--purple-deep)); box-shadow: 0 6px 16px rgba(76,31,214,.35); }
   .add-btn svg { width: 22px; height: 22px; }
-  .entries { list-style: none; margin: 10px 0 4px; padding: 0; }
-  .entry {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--card); border-radius: 14px; padding: 10px 12px; margin-bottom: 8px;
-    box-shadow: var(--shadow);
-  }
-  .entry .e-main { flex: 1; min-width: 0; }
-  .entry .e-name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .entry .e-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
-  .entry .e-kcal { font-weight: 600; font-size: 15px; white-space: nowrap; }
-  .entry .e-del { width: 32px; height: 32px; border-radius: 50%; color: var(--ink-3); display: grid; place-items: center; }
-  .entry .e-del svg { width: 16px; height: 16px; }
+  .entries { list-style: none; margin: 10px 0 4px; padding: 0; display: grid; gap: 8px; }
+  .entry { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow); }
+  .e-main { flex: 1; min-width: 0; }
+  .e-name { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+  .e-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .e-kcal { font-weight: 600; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .e-del { width: 36px; height: 36px; border-radius: 50%; color: var(--ink-3); display: grid; place-items: center; flex: none; }
+  .e-del svg { width: 16px; height: 16px; }
 
-  .summary {
-    margin-top: 22px; background: var(--card); border-radius: var(--radius); padding: 16px;
-    box-shadow: var(--shadow);
-  }
+  /* Recommendations */
+  .recs { margin-top: 24px; }
+  .recs h3 { margin: 0; font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+  .recs .why { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+  .recs .why b { color: var(--ink); }
+  .rec-row { display: flex; gap: 10px; overflow-x: auto; padding: 12px 2px 8px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .rec-row::-webkit-scrollbar { display: none; }
+  .rec { flex: none; width: 200px; scroll-snap-align: start; text-align: left; background: var(--card); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+  .rec .r-cat { font-size: 11px; font-weight: 600; color: var(--purple); text-transform: uppercase; letter-spacing: .6px; }
+  .rec .r-name { font-size: 15px; font-weight: 600; line-height: 1.3; min-height: 39px; }
+  .rec .r-kcal { font-family: var(--font-display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rec .r-kcal small { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--ink-3); }
+  .rec .r-macros { font-size: 12px; color: var(--ink-3); }
+  .rec .r-fit { font-size: 11px; color: var(--ink-2); }
+  .sub-head { font-size: 13px; color: var(--ink-3); font-weight: 600; margin: 10px 0 0; text-transform: uppercase; letter-spacing: .6px; }
+  .ask-pick { margin-top: 6px; display: inline-flex; align-items: center; gap: 6px; color: var(--purple); font-weight: 600; font-size: 14px; padding: 8px 0; }
+  .ask-pick svg { width: 18px; height: 18px; }
+
+  .summary { margin-top: 22px; background: var(--card); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); }
   .summary h3 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
   .summary .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .summary .cell { background: var(--bg); border-radius: 12px; padding: 10px; }
-  .summary .cell .k { font-size: 12px; color: var(--ink-3); }
-  .summary .cell .v { font-size: 17px; font-weight: 600; margin-top: 2px; }
-  .summary .cell .v small { font-size: 12px; color: var(--ink-3); font-weight: 400; }
+  .summary .cell { background: var(--bg); border-radius: 12px; padding: 10px; min-width: 0; }
+  .summary .k { font-size: 12px; color: var(--ink-3); }
+  .summary .v { font-size: 17px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .summary .v small { font-size: 12px; color: var(--ink-3); font-weight: 400; }
 
-  /* ---------- Floating quick-log ---------- */
-  .fab {
-    position: fixed; left: 50%; transform: translateX(-50%);
-    bottom: calc(env(safe-area-inset-bottom) + 18px);
-    display: flex; gap: 8px; padding: 8px; border-radius: 99px;
-    background: var(--card); box-shadow: 0 10px 30px rgba(76,31,214,.25);
-    z-index: 20;
-  }
-  .fab button {
-    display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 99px;
-    font-weight: 600; font-size: 15px; white-space: nowrap;
-  }
+  /* Floating action bar */
+  .fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); display: flex; gap: 6px; padding: 6px; border-radius: 99px; background: var(--card); box-shadow: 0 10px 30px rgba(76,31,214,.28); z-index: 20; }
+  .fab button { display: flex; align-items: center; gap: 6px; padding: 12px 16px; border-radius: 99px; font-weight: 600; font-size: 15px; white-space: nowrap; }
   .fab .scan { background: var(--purple); color: #fff; }
-  .fab .manual { background: rgba(106,60,240,.10); color: var(--purple); }
-  .fab svg { width: 20px; height: 20px; }
+  .fab .manual, .fab .ask { background: var(--soft); color: var(--purple); }
+  .fab svg { width: 19px; height: 19px; }
 
   /* ---------- Bottom sheet ---------- */
   .scrim { position: fixed; inset: 0; background: rgba(20,10,50,.45); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
   .scrim.open { opacity: 1; pointer-events: auto; }
-  .sheet {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 31;
-    max-width: 640px; margin: 0 auto;
-    background: var(--bg); border-radius: 24px 24px 0 0;
-    max-height: 92vh; display: flex; flex-direction: column;
-    transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; max-width: 640px; margin: 0 auto; background: var(--bg); border-radius: 24px 24px 0 0; height: 92vh; display: flex; flex-direction: column; transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1); padding-bottom: env(safe-area-inset-bottom, 0px); }
   .sheet.open { transform: translateY(0); }
-  .sheet-grip { width: 40px; height: 5px; border-radius: 9px; background: rgba(106,60,240,.25); margin: 10px auto 4px; flex: none; }
+  .sheet-grip { width: 40px; height: 5px; border-radius: 9px; background: var(--line); margin: 10px auto 4px; flex: none; }
   .sheet-head { display: flex; align-items: center; gap: 8px; padding: 6px 16px 10px; flex: none; }
-  .sheet-head h3 { flex: 1; margin: 0; font-size: 18px; font-weight: 600; }
-  .sheet-head .close { width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; }
-  .sheet-head .close svg { width: 18px; height: 18px; }
-  .sheet-body { overflow-y: auto; padding: 0 16px 20px; flex: 1; -webkit-overflow-scrolling: touch; }
+  .sheet-head h3 { flex: 1; margin: 0; font-size: 18px; font-weight: 600; min-width: 0; }
+  .round { width: 36px; height: 36px; border-radius: 50%; background: var(--card); display: grid; place-items: center; flex: none; }
+  .round svg { width: 18px; height: 18px; }
+  .sheet-body { overflow-y: auto; padding: 0 16px 20px; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
+  .sheet-foot { flex: none; padding: 8px 16px 12px; border-top: 1px solid var(--line); }
 
   .meal-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 10px; flex: none; scrollbar-width: none; }
   .meal-tabs::-webkit-scrollbar { display: none; }
@@ -184,141 +157,151 @@
   .meal-tabs button.on { background: var(--purple); color: #fff; }
 
   .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-  .mode {
-    background: var(--card); border-radius: 18px; padding: 16px 12px; text-align: left;
-    box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px;
-  }
+  .mode { background: var(--card); border-radius: 18px; padding: 16px 12px; text-align: left; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
   .mode svg { width: 28px; height: 28px; color: var(--purple); }
   .mode b { font-size: 15px; }
   .mode span { font-size: 12px; color: var(--ink-3); }
-
-  .search {
-    display: flex; align-items: center; gap: 10px; background: var(--card);
-    border-radius: 16px; padding: 0 14px; box-shadow: var(--shadow);
-  }
+  .search { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 16px; padding: 0 14px; box-shadow: var(--shadow); }
   .search svg { width: 20px; height: 20px; color: var(--ink-3); flex: none; }
   .search input { flex: 1; border: 0; outline: 0; background: transparent; padding: 14px 0; font-size: 16px; min-width: 0; }
   .chips { display: flex; gap: 6px; overflow-x: auto; margin: 12px 0 4px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .chips button { padding: 6px 12px; border-radius: 99px; background: var(--card); font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+  .chips button { padding: 7px 12px; border-radius: 99px; background: var(--card); font-size: 13px; color: var(--ink-2); white-space: nowrap; }
   .chips button.on { background: var(--ink); color: var(--bg); }
-
-  .results { list-style: none; padding: 0; margin: 10px 0 0; }
-  .result {
-    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-    background: var(--card); border-radius: 14px; padding: 12px; margin-bottom: 8px;
-  }
-  .result .r-main { flex: 1; min-width: 0; }
+  .results { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+  .result { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: var(--card); border-radius: 14px; padding: 12px; }
+  .r-main { flex: 1; min-width: 0; }
   .result .r-name { font-size: 15px; font-weight: 500; }
   .result .r-meta { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
-  .result .r-kcal { font-weight: 600; white-space: nowrap; font-size: 14px; }
-  .muted { color: var(--ink-3); font-size: 13px; text-align: center; padding: 14px 0; }
+  .result .r-kcal { font-weight: 600; white-space: nowrap; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--ink-3); font-size: 13px; text-align: center; padding: 14px 0; line-height: 1.5; }
   .link-btn { color: var(--purple); font-weight: 600; font-size: 14px; padding: 10px 0; display: block; width: 100%; text-align: center; }
-  .section-label { font-size: 13px; color: var(--ink-3); font-weight: 600; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+  .section-label { font-size: 12px; color: var(--ink-3); font-weight: 600; margin: 18px 0 8px; text-transform: uppercase; letter-spacing: .6px; }
 
-  /* Detail / confirm view */
   .detail-card { background: var(--card); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); }
   .detail-card h4 { margin: 0; font-size: 18px; }
   .detail-card .src { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
-  .big-kcal { font-size: 40px; font-weight: 700; margin: 14px 0 4px; }
-  .big-kcal small { font-size: 16px; font-weight: 500; color: var(--ink-2); }
+  .big-kcal { font-family: var(--font-display); font-size: 40px; font-weight: 700; margin: 14px 0 4px; font-variant-numeric: tabular-nums; }
+  .big-kcal small { font-family: var(--font); font-size: 16px; font-weight: 500; color: var(--ink-2); }
   .macro-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 10px; }
-  .macro-row div { text-align: center; background: var(--bg); border-radius: 12px; padding: 8px 2px; }
+  .macro-row div { text-align: center; background: var(--bg); border-radius: 12px; padding: 8px 2px; min-width: 0; }
   .macro-row .k { font-size: 11px; color: var(--ink-3); }
-  .macro-row .v { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .macro-row .v { font-size: 15px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .qty { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; gap: 10px; }
   .qty .q-label { font-size: 14px; color: var(--ink-2); }
   .stepper { display: flex; align-items: center; gap: 4px; background: var(--bg); border-radius: 99px; padding: 4px; }
   .stepper button { width: 40px; height: 40px; border-radius: 50%; background: var(--card); font-size: 22px; font-weight: 500; color: var(--purple); }
   .stepper input { width: 56px; text-align: center; border: 0; background: transparent; font-size: 17px; font-weight: 600; outline: 0; }
-  .primary {
-    width: 100%; margin-top: 16px; padding: 15px; border-radius: 16px;
-    background: var(--purple); color: #fff; font-weight: 600; font-size: 16px;
-  }
+  .primary { width: 100%; margin-top: 16px; padding: 15px; border-radius: 16px; background: var(--purple); color: #fff; font-weight: 600; font-size: 16px; }
   .primary:disabled { opacity: .5; }
-  .secondary { width: 100%; margin-top: 10px; padding: 13px; border-radius: 16px; background: rgba(106,60,240,.10); color: var(--purple); font-weight: 600; font-size: 15px; }
+  .secondary { width: 100%; margin-top: 10px; padding: 13px; border-radius: 16px; background: var(--soft); color: var(--purple); font-weight: 600; font-size: 15px; }
+  .danger { color: var(--over); }
+  .danger.armed { background: var(--over); color: #fff; }
 
   .form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .form .full { grid-column: 1 / -1; }
+  .field { min-width: 0; }
   .field label { display: block; font-size: 12px; color: var(--ink-3); margin: 0 0 4px 4px; }
-  .field input, .field select {
-    width: 100%; border: 1px solid rgba(106,60,240,.15); background: var(--card);
-    border-radius: 12px; padding: 12px; font-size: 16px; outline: 0;
-  }
+  .field input { width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 12px; font-size: 16px; outline: 0; }
   .field input:focus { border-color: var(--purple); }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink-2); margin-top: 12px; line-height: 1.4; }
+  .check input { width: 20px; height: 20px; accent-color: var(--purple); flex: none; margin: 0; }
   .note { font-size: 12px; color: var(--ink-3); line-height: 1.5; margin-top: 10px; }
-  .note a { color: var(--purple); }
+
+  .acct-list { display: grid; gap: 8px; }
+  .acct { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--card); border-radius: 16px; padding: 12px; box-shadow: var(--shadow); }
+  .acct .av { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 18px; background: radial-gradient(circle at 30% 30%, #8f6bff, var(--purple-deep)); flex: none; }
+  .acct .a-name { font-weight: 600; font-size: 16px; }
+  .acct .a-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .acct.cur { outline: 2px solid var(--purple); }
 
   .scan-preview { width: 100%; border-radius: 16px; max-height: 240px; object-fit: cover; display: block; }
-  .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid rgba(106,60,240,.2); border-top-color: var(--purple); animation: spin 1s linear infinite; margin: 18px auto 8px; }
+  .spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--soft); border-top-color: var(--purple); animation: spin 1s linear infinite; margin: 18px auto 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .ai-item { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border-radius: 14px; padding: 12px; margin-bottom: 8px; }
-  .ai-item input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--purple); margin-top: 2px; flex: none; }
-  .ai-item .r-main { flex: 1; min-width: 0; }
+  .ai-item input { width: 20px; height: 20px; accent-color: var(--purple); margin-top: 2px; flex: none; }
 
-  .toast {
-    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 96px); transform: translate(-50%, 20px);
-    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 14px;
-    opacity: 0; transition: all .25s; z-index: 50; pointer-events: none; max-width: calc(100vw - 32px); text-align: center;
-  }
+  /* Chat */
+  .chat { display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 88%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--purple); color: #fff; border-bottom-right-radius: 6px; }
+  .msg.bot { align-self: flex-start; background: var(--card); box-shadow: var(--shadow); border-bottom-left-radius: 6px; }
+  .msg.bot p { margin: 0 0 8px; } .msg.bot p:last-child { margin: 0; }
+  .msg.bot ul { margin: 4px 0 8px; padding-left: 20px; }
+  .msg.status { align-self: flex-start; font-size: 13px; color: var(--ink-3); padding: 2px 4px; }
+  .chat-input { display: flex; gap: 8px; align-items: flex-end; }
+  .chat-input textarea { flex: 1; min-width: 0; resize: none; border: 1px solid var(--line); background: var(--card); border-radius: 18px; padding: 11px 14px; font-size: 16px; max-height: 120px; outline: 0; }
+  .chat-input textarea:focus { border-color: var(--purple); }
+  .send { width: 44px; height: 44px; border-radius: 50%; background: var(--purple); color: #fff; display: grid; place-items: center; flex: none; }
+  .send svg { width: 20px; height: 20px; }
+  .send.stop { background: var(--ink); color: var(--bg); }
+  .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .suggest button { padding: 8px 12px; border-radius: 99px; background: var(--card); font-size: 13px; color: var(--ink-2); text-align: left; box-shadow: var(--shadow); }
+
+  .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-size: 14px; opacity: 0; transition: opacity .25s, transform .25s; z-index: 50; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
-  .hidden { display: none !important; }
-  @media (max-width: 360px) {
-    .fab button { padding: 12px 14px; font-size: 14px; }
+  @media (max-width: 380px) {
+    .fab button { padding: 12px 12px; font-size: 14px; }
     .bar .lbl { font-size: 10px; }
   }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
-</head>
-<body>
-  <header class="hero">
-    <div class="hero-inner">
-      <div class="topbar">
-        <button class="icon-btn ghost" id="todayBtn" aria-label="Go to today">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        </button>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+
+<header class="hero">
+  <div class="wrap">
+    <div class="topbar">
+      <label class="icon-btn ghost" aria-label="Jump to a date" title="Jump to a date">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <input type="date" id="dateJump" class="date-jump">
+      </label>
+      <div class="brand">
+        <div class="app">Grace's Calorie Tracker</div>
         <h1 id="title">Food Log</h1>
-        <button class="icon-btn" id="settingsBtn" aria-label="Settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-        </button>
       </div>
-
-      <div class="week">
-        <button class="week-nav" id="prevWeek" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <div class="days" id="days"></div>
-        <button class="week-nav" id="nextWeek" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
-      </div>
-
-      <div class="bars" id="bars"></div>
+      <button class="icon-btn" id="accountBtn" aria-label="Account and settings"><span class="initial" id="accountInitial">·</span></button>
     </div>
-  </header>
 
-  <main>
-    <section id="meals"></section>
-    <section class="summary" id="summary"></section>
-  </main>
-
-  <div class="fab">
-    <button class="scan" id="fabScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg><span id="fabScanLabel">Scan</span></button>
-    <button class="manual" id="fabManual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Manual</button>
-  </div>
-
-  <input type="file" accept="image/*" capture="environment" id="cameraInput" class="hidden">
-
-  <div class="scrim" id="scrim"></div>
-  <div class="sheet" id="sheet" role="dialog" aria-modal="true">
-    <div class="sheet-grip"></div>
-    <div class="sheet-head">
-      <button class="close hidden" id="sheetBack" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-      <h3 id="sheetTitle">Add food</h3>
-      <button class="close" id="sheetClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    <div class="week">
+      <button class="week-nav" id="prevWeek" aria-label="Previous week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="days" id="days"></div>
+      <button class="week-nav" id="nextWeek" aria-label="Next week"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg></button>
     </div>
-    <div class="meal-tabs" id="mealTabs"></div>
-    <div class="sheet-body" id="sheetBody"></div>
+
+    <div class="bars" id="bars"></div>
+    <div class="banner" id="banner" hidden></div>
   </div>
+</header>
 
-  <div class="toast" id="toast"></div>
+<main class="wrap">
+  <section id="meals"></section>
+  <section class="recs" id="recs"></section>
+  <section class="summary" id="summary"></section>
+</main>
 
-  <script src="foods.js"></script>
-  <script type="module" src="app.js"></script>
-</body>
-</html>
+<div class="fab">
+  <button class="scan" id="fabScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>Scan</button>
+  <button class="manual" id="fabManual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Manual</button>
+  <button class="ask" id="fabAsk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Ask</button>
+</div>
+
+<input type="file" accept="image/*" capture="environment" id="cameraInput" hidden>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-grip"></div>
+  <div class="sheet-head">
+    <button class="round" id="sheetBack" aria-label="Back" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <h3 id="sheetTitle">Add food</h3>
+    <button class="round" id="sheetClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="meal-tabs" id="mealTabs"></div>
+  <div class="sheet-body" id="sheetBody"></div>
+  <div class="sheet-foot" id="sheetFoot" hidden></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="foods.js"></script>
+<script src="app.js"></script>
