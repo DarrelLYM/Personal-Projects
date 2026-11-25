@@ -17,9 +17,10 @@ A free calorie tracker for food eaten in Singapore. It runs in any phone browser
 - **Edit entries:** tap any logged food to change its numbers, servings or meal
 - **Picks:** local dishes and low-sugar drinks that fit the calories left today
 - **Prices (optional):** type what you paid when logging, or later by tapping the entry. Nothing is filled in automatically. Prices show on each food, each meal and the day.
-- **Spending tab:** totals for a day, week, month or year, a chart, a breakdown by type of food (fast food, hawker, bubble tea and drinks, café, convenience store, groceries, other) with a filter, and top spends. The type is guessed from where the food comes from and can be changed per entry.
-- **Weight (optional):** one reading per day in kg from the card under the meals, with the change since the last reading and a 90-day chart. Stored with that day's log.
-- **Panels** (search, history, spending, profile…) close with the ✕ or by dragging them down.
+- **Statistics tab:** Spending and Weight. Spending: totals per day, week, month or year, with a bar chart (amount above each bar, price scale on the side; Month shows every month of the year, Year shows every year; tap a bar to open that period), a breakdown by type of food (fast food, hawker, bubble tea and drinks, café, convenience store, groceries, other) with a filter, and top spends. The type is guessed from where the food comes from and can be changed per entry. Weight: week, month and 90-day line charts with a kg scale.
+- **Weight (optional):** one reading per day in kg from the card under the meals, with the change since the last reading. Charts are in Statistics → Weight. Stored with that day's log.
+- **Panels** (search, history, statistics, profile…) close with the ✕ or by dragging them down. The phone's back button steps back through panels instead of leaving the app.
+- **Unsaved typing is kept for 2 minutes** (on that device): if a panel is closed by accident or the app is left mid-entry, reopening it (or the app) brings back what was typed. Passwords are never kept.
 - **Colour theme:** Purple, Baby pink or Baby blue (Profile → Colour theme), saved to the account
 - **History:** search past foods (e.g. "bubble tea") over 7 days, 30 days, this month, this year or all time, or see daily totals and the most-eaten foods
 - **Profile:** edit daily goals; change username (instant) or email (confirmed by a link sent to the new address); reset password; sign out

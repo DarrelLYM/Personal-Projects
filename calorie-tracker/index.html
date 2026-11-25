@@ -332,6 +332,24 @@
   .w-go { font-size: 13px; font-weight: 600; color: var(--purple); }
   .w-chart { width: 100%; height: auto; display: block; }
   .w-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 4px; }
+  .stat-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .stat-tabs button { padding: 10px; border-radius: 14px; background: var(--card); font-weight: 600; color: var(--ink-2); box-shadow: var(--shadow); }
+  .stat-tabs button.on { background: var(--ink); color: var(--bg); }
+  .vchart { display: grid; grid-template-columns: 40px 1fr; height: 170px; padding: 16px 0 20px; }
+  .yaxis { position: relative; }
+  .yaxis span { position: absolute; right: 6px; transform: translateY(50%); font-size: 10px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .plot { position: relative; }
+  .plot .grid { position: absolute; left: 0; right: 0; height: 1px; background: var(--line); }
+  .cols { position: absolute; inset: 0; display: flex; gap: 3px; }
+  .cols .col { flex: 1; min-width: 0; position: relative; padding: 0; display: block; }
+  .cols .col i { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 72%; max-width: 30px; border-radius: 5px 5px 2px 2px; background: var(--purple-2); }
+  .cols .col.on i { background: var(--purple); }
+  .cols .col em { position: absolute; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 9.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .cols .col .xl { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--ink-3); white-space: nowrap; }
+  .cols .col.on .xl { color: var(--purple); font-weight: 700; }
+  .chart-hint { margin: 2px 0 0; font-size: 11px; color: var(--ink-3); }
+  .w-chart .ax { font-size: 10px; fill: var(--ink-3); font-family: var(--font); }
+  .w-chart .pv { font-size: 9.5px; font-weight: 600; fill: var(--ink-2); font-family: var(--font); }
   /* ---------- Prices & spending ---------- */
   .e-right { text-align: right; flex: none; }
   .e-price { font-size: 12px; font-weight: 600; color: #0e8a45; font-variant-numeric: tabular-nums; margin-top: 2px; }
@@ -434,7 +452,7 @@
     <button class="scan" id="fabScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M7 9v6M10 9v6M13 9v6M16 9v6"/></svg>Scan</button>
     <button class="manual" id="fabManual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Manual</button>
     <button class="hist" id="fabHistory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>History</button>
-    <button class="hist" id="fabSpend"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M6.5 15h3"/></svg>Spending</button>
+    <button class="hist" id="fabStats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Statistics</button>
   </div>
 </div>
 

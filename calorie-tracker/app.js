@@ -180,6 +180,7 @@ function subscribeProfile() {
       state.profile = snap.data();
       if ((state.profile.scheme || "purple") !== currentScheme()) applyScheme(state.profile.scheme || "purple");
       renderAll();
+      if (!state.draftChecked) { state.draftChecked = true; setTimeout(restoreDraftAtStart, 0); }
       if (!snap.metadata.fromCache && !state.profileChecked) { state.profileChecked = true; afterProfileLoad(); }
       return;
     }
@@ -624,9 +625,83 @@ function toggleFavourite(f) {
 const sheet = { meal: mealForNow(), stack: [] };
 const sheetOpen = () => $("#sheet").classList.contains("open");
 
+// ---------- Back button ----------
+// Each screen opened in the sheet adds a browser history entry, so the phone's back button
+// steps back through them (and finally closes the sheet) instead of leaving the app.
+let navDepth = 0;
+function navPush() {
+  navDepth++;
+  try { history.pushState({ gctDepth: navDepth }, ""); } catch { /* ignore */ }
+}
+window.addEventListener("popstate", (e) => {
+  const d = e.state?.gctDepth || 0;
+  if (d >= navDepth) { navDepth = d; return; }
+  navDepth = d;
+  if (!sheetOpen()) return;
+  const len = d - sheet.base;
+  if (len <= 0) { hideSheet(); return; }
+  while (sheet.stack.length > len) sheet.stack.pop();
+  const [view, arg] = sheet.stack[sheet.stack.length - 1];
+  show(view, arg, false);
+});
+
+// ---------- Unsaved typing (kept for 2 minutes) ----------
+const DRAFT_KEY = "gct-draft", DRAFT_MS = 2 * 60 * 1000;
+const DRAFT_VIEWS = new Set(["add", "quick", "custom", "detail", "editEntry", "weight", "editUsername", "editEmail", "profile"]);
+const slimArg = (arg) => (arg && typeof arg === "object" ? Object.fromEntries(Object.entries(arg).filter(([k]) => k !== "hay" && k !== "words")) : arg ?? null);
+// Drafts are kept per screen (view + what it's showing), so going back to an earlier screen restores it too.
+const draftKey = (view, arg) => view + ":" + JSON.stringify(slimArg(arg));
+function readDrafts() {
+  try {
+    const all = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}");
+    const out = {};
+    for (const [k, d] of Object.entries(all && typeof all === "object" && !all.view ? all : {})) {
+      if (d && Date.now() - d.at <= DRAFT_MS && d.uid === state.user?.uid) out[k] = d;
+    }
+    return out;
+  } catch { return {}; }
+}
+function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } }
+function saveDraft(view, arg) {
+  if (!DRAFT_VIEWS.has(view) || !state.user) return;
+  const vals = {};
+  $("#sheetBody").querySelectorAll("input[id], select[id], textarea[id]").forEach((el) => {
+    if (el.type === "password" || el.type === "file") return;
+    vals[el.id] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  const all = readDrafts();
+  all[draftKey(view, arg)] = { uid: state.user.uid, view, arg: slimArg(arg), meal: sheet.meal, date: ymd(state.selectedDate), vals, at: Date.now() };
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+}
+// Refills the screen if what was being typed on it was left less than 2 minutes ago.
+function fillDraft(view, arg) {
+  const d = readDrafts()[draftKey(view, arg)];
+  if (!d || d.date !== ymd(state.selectedDate)) return false;
+  const body = $("#sheetBody");
+  let n = 0;
+  for (const [id, v] of Object.entries(d.vals)) {
+    const el = body.querySelector("#" + CSS.escape(id));
+    if (!el) continue;
+    let changed = false;
+    if (el.type === "checkbox") { if (el.checked !== v && !el.disabled) { el.checked = v; changed = true; } }
+    else if (el.value !== v) { el.value = v; changed = true; }
+    if (changed) { n++; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }
+  }
+  return n > 0;
+}
+// On opening the app: go back to the most recent unfinished screen, if any.
+function restoreDraftAtStart() {
+  const d = Object.values(readDrafts()).sort((a, b) => b.at - a.at)[0];
+  if (!d || sheetOpen() || !VIEWS[d.view]) return;
+  state.selectedDate = parseYmd(d.date);
+  renderAll();
+  openSheet(d.meal, d.view, d.arg ?? undefined);
+}
+
 function openSheet(mealId, view = "add", arg) {
   sheet.meal = mealId || (ymd(state.selectedDate) === todayKey() ? mealForNow() : sheet.meal);
   sheet.stack = [];
+  sheet.base = navDepth;
   $("#scrim").classList.add("open");
   $("#sheet").classList.add("open");
   show(view, arg);
@@ -658,7 +733,7 @@ function enableSheetDrag() {
     const fast = dy / Math.max(1, Date.now() - t0) > 0.5 && dy > 40;
     const shut = decided && (dy > Math.min(160, el.offsetHeight * 0.25) || fast);
     reset();
-    if (shut) closeSheet();
+    if (shut) closeSheet({ keepDraft: true });
   };
   const grabZone = (t) => t.closest(".sheet-grip, .sheet-head") && !t.closest("button, input, select");
   el.addEventListener("touchstart", (e) => {
@@ -681,7 +756,14 @@ function enableSheetDrag() {
   });
 }
 
-function closeSheet() {
+// Closes the sheet. After saving, the typed-in draft is dropped; when the user just
+// dismisses the sheet (✕, drag, back), it's kept for 2 minutes in case that was an accident.
+function closeSheet(opts = {}) {
+  if (!opts.keepDraft) clearDraft();
+  if (navDepth > 0) { const n = navDepth; navDepth = 0; try { history.go(-n); } catch { /* ignore */ } }
+  hideSheet();
+}
+function hideSheet() {
   stopCamera();
   $("#scrim").classList.remove("open");
   $("#sheet").classList.remove("open");
@@ -695,14 +777,16 @@ function renderMealTabs(visible) {
 
 function show(view, arg, push = true) {
   stopCamera();
-  if (push) sheet.stack.push([view, arg]);
+  if (push) { sheet.stack.push([view, arg]); navPush(); }
   $("#sheetBack").hidden = sheet.stack.length < 2;
   const body = $("#sheetBody");
   body.scrollTop = 0;
   VIEWS[view](body, arg);
+  if (DRAFT_VIEWS.has(view) && fillDraft(view, arg)) toast("Restored what you were typing");
 }
 
 function back() {
+  if (navDepth > sheet.base) { history.back(); return; }
   sheet.stack.pop();
   const [view, arg] = sheet.stack[sheet.stack.length - 1] || ["add"];
   show(view, arg, false);
@@ -1110,96 +1194,264 @@ async function runHistory() {
     }).join("")}`;
 }
 
-// ---------- Spending ----------
+// ---------- Statistics: spending and weight ----------
+const stats = { tab: "spend" };
 const spend = { period: "week", offset: 0, filter: "all" };
+const wstat = { period: "week", offset: 0 };
 const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
+const WPERIODS = [["week", "Week"], ["month", "Month"], ["90", "90 days"]];
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const today0 = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
+const daysBetween = (a, b) => Math.round((b - a) / 86400000);
 
-function spendRange() {
-  const t = new Date(); t.setHours(0, 0, 0, 0);
-  const o = spend.offset;
-  if (spend.period === "day") { const d = new Date(t); d.setDate(d.getDate() + o); return [d, d]; }
-  if (spend.period === "week") { const a = weekStart(t); a.setDate(a.getDate() + 7 * o); const b = new Date(a); b.setDate(a.getDate() + 6); return [a, b]; }
-  if (spend.period === "month") { const a = new Date(t.getFullYear(), t.getMonth() + o, 1); return [a, new Date(a.getFullYear(), a.getMonth() + 1, 0)]; }
+// The selected period for a given offset (0 = the current one).
+function periodRange(period, o) {
+  const t = today0();
+  if (period === "day") { const d = new Date(t); d.setDate(d.getDate() + o); return [d, d]; }
+  if (period === "week") { const a = weekStart(t); a.setDate(a.getDate() + 7 * o); const b = new Date(a); b.setDate(a.getDate() + 6); return [a, b]; }
+  if (period === "month") { const a = new Date(t.getFullYear(), t.getMonth() + o, 1); return [a, new Date(a.getFullYear(), a.getMonth() + 1, 0)]; }
+  if (period === "90") { const b = new Date(t); b.setDate(b.getDate() + 90 * o); const a = new Date(b); a.setDate(b.getDate() - 89); return [a, b]; }
   const y = t.getFullYear() + o; return [new Date(y, 0, 1), new Date(y, 11, 31)];
 }
 
-function spendLabel([a, b]) {
-  const o = spend.offset;
-  if (spend.period === "day") return o === 0 ? "Today" : o === -1 ? "Yesterday" : a.toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-  if (spend.period === "week") return o === 0 ? "This week" : `${a.getDate()} ${MON[a.getMonth()]} – ${b.getDate()} ${MON[b.getMonth()]}${b.getFullYear() !== new Date().getFullYear() ? " " + b.getFullYear() : ""}`;
-  if (spend.period === "month") return `${a.toLocaleDateString("en-SG", { month: "long" })} ${a.getFullYear()}`;
+function periodLabel(period, o, [a, b]) {
+  const yr = (d) => (d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : "");
+  if (period === "day") return o === 0 ? "Today" : o === -1 ? "Yesterday" : a.toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  if (period === "week") return o === 0 ? "This week" : `${a.getDate()} ${MON[a.getMonth()]} – ${b.getDate()} ${MON[b.getMonth()]}${yr(b)}`;
+  if (period === "month") return `${a.toLocaleDateString("en-SG", { month: "long" })} ${a.getFullYear()}`;
+  if (period === "90") return o === 0 ? "Last 90 days" : `${a.getDate()} ${MON[a.getMonth()]}${yr(a)} – ${b.getDate()} ${MON[b.getMonth()]}${yr(b)}`;
   return String(a.getFullYear());
+}
+
+// A round number at or above v, for chart scales (1, 2, 2.5 or 5 × a power of ten).
+function niceCeil(v) {
+  if (!(v > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v - 1e-9) return m * p;
+  return 10 * p;
+}
+// Short money for chart labels: $7.90 → "$7.9", $12.40 → "$12", $1,250 → "$1.3k".
+const moneyShort = (v) => (v >= 1000 ? `$${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : v >= 10 || Number.isInteger(v) ? `$${Math.round(v)}` : `$${v.toFixed(1)}`);
+
+// Vertical bar chart with a price scale on the left and the amount above each bar.
+function barChart(buckets, color) {
+  const max = Math.max(0, ...buckets.map((b) => b.v));
+  const top = niceCeil(max);
+  const ticks = [0, top / 2, top];
+  return `<div class="vchart">
+    <div class="yaxis">${ticks.map((t) => `<span style="bottom:${(t / top) * 100}%">${moneyShort(t)}</span>`).join("")}</div>
+    <div class="plot">
+      ${ticks.map((t) => `<i class="grid" style="bottom:${(t / top) * 100}%"></i>`).join("")}
+      <div class="cols">${buckets.map((b) => {
+        const h = (b.v / top) * 100;
+        const tag = b.jump ? "button" : "div";
+        return `<${tag} class="col${b.on ? " on" : ""}"${b.jump ? ` data-jump="${b.jump}"` : ""} title="${esc(b.title || b.label)}: ${money(b.v)}">
+          ${b.v > 0 ? `<em style="bottom:calc(${h}% + 2px)">${moneyShort(b.v)}</em>` : ""}
+          <i style="height:${b.v > 0 ? Math.max(1.5, h) : 0}%;${color ? "background:" + color : ""}"></i>
+          <span class="xl">${esc(b.label)}</span></${tag}>`;
+      }).join("")}</div>
+    </div>
+  </div>`;
 }
 
 async function runSpending() {
   const out = $("#spendOut");
   if (!out) return;
-  const range = spendRange();
+  const range = periodRange(spend.period, spend.offset);
   const [a, b] = range;
-  $("#spendLabel").textContent = spendLabel(range);
+  const aKey = ymd(a), bKey = ymd(b);
+  $("#spendLabel").textContent = periodLabel(spend.period, spend.offset, range);
   $("#spendNext").disabled = spend.offset >= 0;
   out.innerHTML = '<div class="spinner"></div>';
+  // Load the whole chart's span: the week for Week, the year for Month, every year for Year.
   let days;
-  try { days = await loadRange(ymd(a), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your spending. Check your connection.</p>'; return; }
+  try {
+    if (spend.period === "year") days = (await allMonths()).flatMap(([, m]) => Object.entries(m.days || {}));
+    else if (spend.period === "month") days = await loadRange(`${a.getFullYear()}-01-01`, `${a.getFullYear()}-12-31`);
+    else days = await loadRange(aKey, bKey);
+  } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your spending. Check your connection.</p>'; return; }
   if (!$("#spendOut")) return;
-  const all = [];
+  const ctx = [];
   let unpriced = 0;
   for (const [date, d] of days) for (const m of MEALS) for (const e of d[m.id] || []) {
-    if (hasPrice(e)) all.push({ date, meal: m.id, e, price: num(e.price), type: spendType(e) });
-    else unpriced++;
+    const inPeriod = date >= aKey && date <= bKey;
+    if (hasPrice(e)) ctx.push({ date, meal: m.id, e, price: num(e.price), type: spendType(e), inPeriod });
+    else if (inPeriod) unpriced++;
   }
-  const items = spend.filter === "all" ? all : all.filter((x) => x.type === spend.filter);
+  const typed = (list) => (spend.filter === "all" ? list : list.filter((x) => x.type === spend.filter));
+  const all = ctx.filter((x) => x.inPeriod);
+  const items = typed(all);
+  const chartItems = typed(ctx);
   const total = items.reduce((s, x) => s + x.price, 0);
+  const sum = (pred) => chartItems.filter(pred).reduce((s, x) => s + x.price, 0);
 
-  // Chart buckets
-  let buckets;
-  if (spend.period === "day") buckets = MEALS.map((m) => ({ label: m.name, key: m.id, match: (x) => x.meal === m.id }));
-  else if (spend.period === "year") buckets = MON.map((label, i) => ({ label: label.charAt(0), title: label, key: i, match: (x) => +x.date.slice(5, 7) === i + 1 }));
-  else {
+  let buckets, chartTitle, avg = "";
+  const t = today0(), todayK = todayKey();
+  if (spend.period === "day") {
+    chartTitle = "By meal";
+    buckets = MEALS.map((m) => ({ label: m.name, v: sum((x) => x.meal === m.id) }));
+  } else if (spend.period === "week") {
+    chartTitle = "By day";
     buckets = [];
-    for (let d = new Date(a); d <= b; d.setDate(d.getDate() + 1)) {
-      const key = ymd(d), n = d.getDate();
-      buckets.push({ label: spend.period === "week" ? ["S", "M", "T", "W", "T", "F", "S"][d.getDay()] : (n === 1 || n % 5 === 0 ? String(n) : ""), title: prettyDate(key), key, match: (x) => x.date === key });
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(a); d.setDate(a.getDate() + i);
+      const k = ymd(d);
+      buckets.push({ label: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()], title: prettyDate(k), v: sum((x) => x.date === k), on: k === todayK,
+        jump: d <= t ? `day:${daysBetween(t, d)}` : "" });
     }
+    avg = `avg ${money(total / 7)} a day`;
+  } else if (spend.period === "month") {
+    chartTitle = `Every month of ${a.getFullYear()}`;
+    buckets = MON.map((label, i) => {
+      const first = new Date(a.getFullYear(), i, 1);
+      const o = (first.getFullYear() - t.getFullYear()) * 12 + (i - t.getMonth());
+      return { label: label.charAt(0), title: `${label} ${a.getFullYear()}`, v: sum((x) => +x.date.slice(5, 7) === i + 1), on: i === a.getMonth(), jump: o <= 0 ? `month:${o}` : "" };
+    });
+    const ytd = buckets.filter((bk, i) => new Date(a.getFullYear(), i, 1) <= t);
+    if (ytd.length) avg = `avg ${money(ytd.reduce((s, bk) => s + bk.v, 0) / ytd.length)} a month`;
+  } else {
+    chartTitle = "Every year";
+    const years = ctx.map((x) => +x.date.slice(0, 4));
+    const cur = t.getFullYear();
+    let y0 = Math.min(cur - 2, a.getFullYear(), ...years);
+    y0 = Math.max(y0, cur - 9);
+    buckets = [];
+    for (let y = y0; y <= cur; y++) buckets.push({ label: String(y), title: String(y), v: sum((x) => +x.date.slice(0, 4) === y), on: y === a.getFullYear(), jump: `year:${y - cur}` });
   }
-  const sums = buckets.map((bk) => items.filter(bk.match).reduce((s, x) => s + x.price, 0));
-  const max = Math.max(...sums, 0.01);
-  const today = todayKey(), curMonth = new Date().getMonth();
-  const isCur = (bk) => (spend.period === "year" ? spend.offset === 0 && bk.key === curMonth : bk.key === today);
-  const filterColor = spend.filter === "all" ? "" : SPEND_TYPES.find((t) => t.id === spend.filter).color;
-  const per = { week: ["day", 7], month: ["day", buckets.length], year: ["month", 12] }[spend.period];
+  const filterColor = spend.filter === "all" ? "" : SPEND_TYPES.find((x) => x.id === spend.filter).color;
 
-  // Breakdown by type (always across all types, so the filter shows its share)
-  const byType = SPEND_TYPES.map((t) => ({ ...t, v: all.filter((x) => x.type === t.id).reduce((s, x) => s + x.price, 0), n: all.filter((x) => x.type === t.id).length })).filter((t) => t.v > 0).sort((p, q) => q.v - p.v);
-  const allTotal = byType.reduce((s, t) => s + t.v, 0);
-
-  // Top foods
+  const byType = SPEND_TYPES.map((ty) => ({ ...ty, v: all.filter((x) => x.type === ty.id).reduce((s, x) => s + x.price, 0), n: all.filter((x) => x.type === ty.id).length })).filter((ty) => ty.v > 0).sort((p, q) => q.v - p.v);
+  const allTotal = byType.reduce((s, ty) => s + ty.v, 0);
   const foods = new Map();
-  for (const x of items) { const k = x.e.name; const f = foods.get(k) || { name: k, v: 0, n: 0, type: x.type }; f.v += x.price; f.n++; foods.set(k, f); }
+  for (const x of items) { const f = foods.get(x.e.name) || { name: x.e.name, v: 0, n: 0 }; f.v += x.price; f.n++; foods.set(x.e.name, f); }
   const top = [...foods.values()].sort((p, q) => q.v - p.v).slice(0, 8);
+  const hasChart = buckets.some((bk) => bk.v > 0);
 
   $("#spendTotal").textContent = money(total);
   $("#spendSub").textContent = `${spend.filter === "all" ? "" : spendTypeName(spend.filter) + " · "}${items.length} item${items.length === 1 ? "" : "s"} with a price`;
-  out.innerHTML = !all.length
-    ? `<p class="muted">No prices logged ${spend.period === "day" ? "on this day" : "in this period"}. Add a price when you log food, or tap a logged food to add one.</p>`
-    : `
-    <div class="card-box">
-      <div class="box-head"><span>${spend.period === "day" ? "By meal" : spend.period === "year" ? "By month" : "By day"}</span>${per ? `<small>avg ${money(total / per[1])} per ${per[0]}</small>` : ""}</div>
-      <div class="spend-chart">${buckets.map((bk, i) => `<div class="col${isCur(bk) ? " cur" : ""}" title="${esc(bk.title || bk.label)}: ${money(sums[i])}"><i style="height:${sums[i] ? Math.max(3, (sums[i] / max) * 100) : 0}%;${filterColor ? "background:" + filterColor : ""}"></i><span>${esc(bk.label)}</span></div>`).join("")}</div>
-    </div>
+  out.innerHTML = `
+    ${hasChart ? `<div class="card-box"><div class="box-head"><span>${esc(chartTitle)}</span><small>${esc(avg)}</small></div>${barChart(buckets, filterColor)}
+      ${buckets.some((bk) => bk.jump) ? '<p class="chart-hint">Tap a bar to open that ' + (spend.period === "week" ? "day" : spend.period) + ".</p>" : ""}</div>` : ""}
+    ${!all.length ? `<p class="muted">No prices logged ${spend.period === "day" ? "on this day" : "in this period"}. Add a price when you log food, or tap a logged food to add one.</p>` : `
     <div class="card-box">
       <div class="box-head"><span>By type of food</span><small>tap to filter</small></div>
-      <div class="type-stack">${byType.map((t) => `<i style="flex:${t.v};background:${t.color};opacity:${spend.filter === "all" || spend.filter === t.id ? 1 : 0.25}"></i>`).join("")}</div>
-      <div class="type-list">${byType.map((t) => `<button data-type="${t.id}" class="${spend.filter !== "all" && spend.filter !== t.id ? "dim" : ""}">
-        <span class="tn"><i style="background:${t.color}"></i>${esc(t.name)}</span><span class="tv">${money(t.v)}</span>
-        <span class="tt"><i style="width:${(t.v / allTotal) * 100}%;background:${t.color}"></i></span>
-        <span class="ts">${Math.round((t.v / allTotal) * 100)}% · ${t.n} item${t.n === 1 ? "" : "s"}</span></button>`).join("")}</div>
+      <div class="type-stack">${byType.map((ty) => `<i style="flex:${ty.v};background:${ty.color};opacity:${spend.filter === "all" || spend.filter === ty.id ? 1 : 0.25}"></i>`).join("")}</div>
+      <div class="type-list">${byType.map((ty) => `<button data-type="${ty.id}" class="${spend.filter !== "all" && spend.filter !== ty.id ? "dim" : ""}">
+        <span class="tn"><i style="background:${ty.color}"></i>${esc(ty.name)}</span><span class="tv">${money(ty.v)}</span>
+        <span class="tt"><i style="width:${(ty.v / allTotal) * 100}%;background:${ty.color}"></i></span>
+        <span class="ts">${Math.round((ty.v / allTotal) * 100)}% · ${ty.n} item${ty.n === 1 ? "" : "s"}</span></button>`).join("")}</div>
     </div>
     <div class="section-label">Top spends</div>
-    ${top.length ? `<ul class="top-foods">${top.map((f) => `<li><span>${esc(f.name)}${f.n > 1 ? ` <small>× ${f.n}</small>` : ""}</span><span>${money(f.v)}</span></li>`).join("")}</ul>` : '<p class="muted">Nothing of this type in this period.</p>'}
+    ${top.length ? `<ul class="top-foods">${top.map((f) => `<li><span>${esc(f.name)}${f.n > 1 ? ` <small>× ${f.n}</small>` : ""}</span><span>${money(f.v)}</span></li>`).join("")}</ul>` : '<p class="muted">Nothing of this type in this period.</p>'}`}
     ${unpriced ? `<p class="note">${unpriced} logged item${unpriced === 1 ? "" : "s"} in this period ha${unpriced === 1 ? "s" : "ve"} no price and ${unpriced === 1 ? "isn't" : "aren't"} counted. Tap a food on the main screen to add its price.</p>` : ""}
-    <p class="note">The type of food is guessed from where the food comes from. To change it, tap the food on the main screen and pick a different type.</p>`;
+    ${all.length ? '<p class="note">The type of food is guessed from where the food comes from. To change it, tap the food on the main screen and pick a different type.</p>' : ""}`;
+}
+
+// Weight line chart with a kg scale on the left.
+function weightChart(pts, a, b, period) {
+  const W = 340, H = 170, L = 40, R = 10, T = 18, B = 22;
+  const vals = pts.map((p) => p[1]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi - lo < 2) { const mid = (hi + lo) / 2; lo = mid - 1; hi = mid + 1; }
+  const step = [0.5, 1, 2, 5, 10, 20].find((s) => (hi - lo) / s <= 4) || 20;
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const span = Math.max(1, daysBetween(a, b));
+  const x = (k) => L + (daysBetween(a, parseYmd(k)) / span) * (W - L - R);
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const ticks = [];
+  for (let v = lo; v <= hi + 1e-9; v += step) ticks.push(Math.round(v * 10) / 10);
+  const xl = [];
+  if (period === "week") for (let i = 0; i < 7; i++) { const d = new Date(a); d.setDate(a.getDate() + i); xl.push([ymd(d), ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]]); }
+  else if (period === "month") for (const n of [1, 8, 15, 22, 29]) { const d = new Date(a.getFullYear(), a.getMonth(), n); if (d <= b) xl.push([ymd(d), String(n)]); }
+  else { const d = new Date(a.getFullYear(), a.getMonth() + 1, 1); for (; d <= b; d.setMonth(d.getMonth() + 1)) xl.push([ymd(d), MON[d.getMonth()]]); }
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(" ");
+  return `<svg class="w-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight chart">
+    ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end" class="ax">${v % 1 ? v.toFixed(1) : v}</text>`).join("")}
+    ${xl.map(([k, l]) => `<text x="${x(k).toFixed(1)}" y="${H - 6}" text-anchor="middle" class="ax">${l}</text>`).join("")}
+    ${pts.length > 1 ? `<path d="${line}" fill="none" stroke="var(--purple)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
+    ${pts.map((p) => `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="${period === "90" ? 3 : 4}" fill="var(--card)" stroke="var(--purple)" stroke-width="2"><title>${esc(prettyDate(p[0]))}: ${p[1].toFixed(1)} kg</title></circle>`).join("")}
+    ${period === "week" ? pts.map((p) => `<text x="${x(p[0]).toFixed(1)}" y="${(y(p[1]) - 9).toFixed(1)}" text-anchor="middle" class="pv">${p[1].toFixed(1)}</text>`).join("") : ""}
+  </svg>`;
+}
+
+async function runWeightStats() {
+  const out = $("#wsOut");
+  if (!out) return;
+  const range = periodRange(wstat.period, wstat.offset);
+  const [a, b] = range;
+  $("#wsLabel").textContent = periodLabel(wstat.period, wstat.offset, range);
+  $("#wsNext").disabled = wstat.offset >= 0;
+  out.innerHTML = '<div class="spinner"></div>';
+  let days;
+  try { days = await loadRange(ymd(a), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; return; }
+  if (!$("#wsOut")) return;
+  const pts = days.filter(([, d]) => hasWeight(d)).map(([k, d]) => [k, d.weight]);
+  if (!pts.length) { out.innerHTML = `<p class="muted">No weight readings ${wstat.period === "week" ? "this week" : "in this period"}. Log one from the Weight card on the main screen.</p>`; return; }
+  const first = pts[0], last = pts[pts.length - 1];
+  const change = Math.round((last[1] - first[1]) * 10) / 10;
+  const avgW = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  out.innerHTML = `
+    <div class="stat-row">
+      <div class="stat"><div class="k">Latest</div><div class="v">${last[1].toFixed(1)}<small>kg</small></div></div>
+      <div class="stat"><div class="k">Change</div><div class="v">${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(1)}<small>kg</small></div></div>
+      <div class="stat"><div class="k">Average</div><div class="v">${avgW.toFixed(1)}<small>kg</small></div></div>
+    </div>
+    <div class="card-box">${weightChart(pts, a, b, wstat.period)}</div>
+    <ul class="top-foods" style="margin-top:12px">${pts.slice().reverse().slice(0, 14).map(([k, v]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}</span><span>${v.toFixed(1)} kg</span></li>`).join("")}</ul>
+    <p class="note">${pts.length} reading${pts.length === 1 ? "" : "s"}. Change is from the first reading in this period (${esc(prettyDate(first[0]))}).</p>`;
+}
+
+function renderStatTab(body) {
+  body.querySelectorAll("#statTabs button").forEach((x) => x.classList.toggle("on", x.dataset.tab === stats.tab));
+  const box = $("#statBody", body);
+  const seg = (list, cur, id) => `<div class="seg" id="${id}" style="grid-template-columns:repeat(${list.length},1fr)">${list.map(([k, l]) => `<button data-period="${k}" class="${k === cur ? "on" : ""}">${l}</button>`).join("")}</div>`;
+  if (stats.tab === "weight") {
+    box.innerHTML = `
+      ${seg(WPERIODS, wstat.period, "wsPeriod")}
+      <div class="spend-hero"><div class="spend-nav"><button id="wsPrev" aria-label="Previous">‹</button><span id="wsLabel"></span><button id="wsNext" aria-label="Next">›</button></div></div>
+      <div id="wsOut"></div>`;
+    $("#wsPeriod", box).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-period]");
+      if (!b) return;
+      wstat.period = b.dataset.period; wstat.offset = 0;
+      box.querySelectorAll("#wsPeriod button").forEach((x) => x.classList.toggle("on", x === b));
+      runWeightStats();
+    });
+    $("#wsPrev", box).addEventListener("click", () => { wstat.offset--; runWeightStats(); });
+    $("#wsNext", box).addEventListener("click", () => { if (wstat.offset < 0) { wstat.offset++; runWeightStats(); } });
+    runWeightStats();
+    return;
+  }
+  box.innerHTML = `
+    ${seg(PERIODS, spend.period, "spendPeriod")}
+    <div class="spend-hero">
+      <div class="spend-nav"><button id="spendPrev" aria-label="Previous">‹</button><span id="spendLabel"></span><button id="spendNext" aria-label="Next">›</button></div>
+      <div class="spend-total" id="spendTotal">$0.00</div>
+      <div class="spend-sub" id="spendSub"></div>
+    </div>
+    <div class="chips" id="spendFilter">${[{ id: "all", name: "All" }, ...SPEND_TYPES].map((ty) => `<button data-type="${ty.id}" class="${ty.id === spend.filter ? "on" : ""}">${esc(ty.name)}</button>`).join("")}</div>
+    <div id="spendOut"></div>`;
+  const setFilter = (id) => {
+    spend.filter = spend.filter === id && id !== "all" ? "all" : id;
+    box.querySelectorAll("#spendFilter button").forEach((x) => x.classList.toggle("on", x.dataset.type === spend.filter));
+    runSpending();
+  };
+  const setPeriod = (p, o) => {
+    spend.period = p; spend.offset = o;
+    box.querySelectorAll("#spendPeriod button").forEach((x) => x.classList.toggle("on", x.dataset.period === p));
+    runSpending();
+  };
+  $("#spendPeriod", box).addEventListener("click", (e) => { const b = e.target.closest("[data-period]"); if (b) setPeriod(b.dataset.period, 0); });
+  $("#spendPrev", box).addEventListener("click", () => { spend.offset--; runSpending(); });
+  $("#spendNext", box).addEventListener("click", () => { if (spend.offset < 0) { spend.offset++; runSpending(); } });
+  $("#spendFilter", box).addEventListener("click", (e) => { const b = e.target.closest("[data-type]"); if (b) setFilter(b.dataset.type); });
+  $("#spendOut", box).addEventListener("click", (e) => {
+    const j = e.target.closest("[data-jump]");
+    if (j) { const [p, o] = j.dataset.jump.split(":"); setPeriod(p, +o); return; }
+    const b = e.target.closest("[data-type]");
+    if (b) setFilter(b.dataset.type);
+  });
+  runSpending();
 }
 
 // ---------- Views (bottom sheet) ----------
@@ -1496,36 +1748,21 @@ const VIEWS = {
     });
   },
 
-  spending(body) {
-    $("#sheetTitle").textContent = "Spending";
+  stats(body, tab) {
+    $("#sheetTitle").textContent = "Statistics";
     renderMealTabs(false);
-    spend.offset = 0;
+    if (tab) stats.tab = tab;
+    spend.offset = 0; wstat.offset = 0;
     body.innerHTML = `
-      <div class="seg" id="spendPeriod">${PERIODS.map(([k, l]) => `<button data-period="${k}" class="${k === spend.period ? "on" : ""}">${l}</button>`).join("")}</div>
-      <div class="spend-hero">
-        <div class="spend-nav"><button id="spendPrev" aria-label="Previous">‹</button><span id="spendLabel"></span><button id="spendNext" aria-label="Next">›</button></div>
-        <div class="spend-total" id="spendTotal">$0.00</div>
-        <div class="spend-sub" id="spendSub"></div>
-      </div>
-      <div class="chips" id="spendFilter">${[{ id: "all", name: "All" }, ...SPEND_TYPES].map((t) => `<button data-type="${t.id}" class="${t.id === spend.filter ? "on" : ""}">${esc(t.name)}</button>`).join("")}</div>
-      <div id="spendOut"></div>`;
-    const setFilter = (id) => {
-      spend.filter = spend.filter === id && id !== "all" ? "all" : id;
-      body.querySelectorAll("#spendFilter button").forEach((x) => x.classList.toggle("on", x.dataset.type === spend.filter));
-      runSpending();
-    };
-    $("#spendPeriod", body).addEventListener("click", (e) => {
-      const b = e.target.closest("[data-period]");
-      if (!b) return;
-      spend.period = b.dataset.period; spend.offset = 0;
-      body.querySelectorAll("#spendPeriod button").forEach((x) => x.classList.toggle("on", x === b));
-      runSpending();
+      <div class="stat-tabs" id="statTabs"><button data-tab="spend">Spending</button><button data-tab="weight">Weight</button></div>
+      <div id="statBody"></div>`;
+    $("#statTabs", body).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tab]");
+      if (!b || b.dataset.tab === stats.tab) return;
+      stats.tab = b.dataset.tab;
+      renderStatTab(body);
     });
-    $("#spendPrev", body).addEventListener("click", () => { spend.offset--; runSpending(); });
-    $("#spendNext", body).addEventListener("click", () => { if (spend.offset < 0) { spend.offset++; runSpending(); } });
-    $("#spendFilter", body).addEventListener("click", (e) => { const b = e.target.closest("[data-type]"); if (b) setFilter(b.dataset.type); });
-    $("#spendOut", body).addEventListener("click", (e) => { const b = e.target.closest("[data-type]"); if (b) setFilter(b.dataset.type); });
-    runSpending();
+    renderStatTab(body);
   },
 
   weight(body) {
@@ -1537,10 +1774,10 @@ const VIEWS = {
     body.innerHTML = `
       <div class="field"><label for="wIn">Weight on ${esc(sel === todayKey() ? "today" : prettyDate(sel, { weekday: "short", day: "numeric", month: "short", year: "numeric" }))} (kg)</label>
         <input id="wIn" type="number" inputmode="decimal" min="20" max="400" step="0.1" placeholder="${prev ? esc(String(prev[1])) : "e.g. 55.0"}" value="${hasWeight(d) ? esc(d.weight.toFixed(1)) : ""}"></div>
+      ${prev ? `<p class="note">Last reading: ${esc(kg(prev[1]))} on ${esc(prettyDate(prev[0]))}.</p>` : ""}
       <button class="primary" id="wSave">Save weight</button>
       ${hasWeight(d) ? '<button class="secondary danger" id="wDel">Remove this reading</button>' : ""}
-      <div class="section-label">Last 90 days</div>
-      <div id="wOut"><div class="spinner"></div></div>`;
+      <button class="secondary" data-act="weight-stats">See weight charts</button>`;
     setTimeout(() => $("#wIn")?.focus(), 250);
     $("#wSave", body).addEventListener("click", () => {
       const v = num($("#wIn", body).value);
@@ -1550,35 +1787,6 @@ const VIEWS = {
       toast("Weight saved");
     });
     $("#wDel", body)?.addEventListener("click", () => { setWeight(sel, null).catch(() => {}); closeSheet(); toast("Removed"); });
-    const start = shiftDay(todayKey(), -89);
-    loadRange(start, todayKey()).then((days) => {
-      const out = $("#wOut");
-      if (!out) return;
-      const pts = days.filter(([, x]) => hasWeight(x)).map(([k, x]) => [k, x.weight]);
-      if (!pts.length) { out.innerHTML = '<p class="muted">No readings yet. Log your weight now and then to see the trend here.</p>'; return; }
-      const W = 320, H = 120, pad = 8;
-      // The chart spans from the first reading (at least a week back) to today.
-      const from = [pts[0][0], shiftDay(todayKey(), -6)].sort()[0];
-      const t0 = parseYmd(from).getTime(), t1 = parseYmd(todayKey()).getTime();
-      const vals = pts.map((p) => p[1]);
-      const lo = Math.min(...vals) - 0.5, hi = Math.max(...vals) + 0.5;
-      const xy = ([k, v]) => [pad + ((parseYmd(k).getTime() - t0) / Math.max(1, t1 - t0)) * (W - 2 * pad), pad + (1 - (v - lo) / (hi - lo)) * (H - 2 * pad)];
-      const line = pts.map((p, i) => (i ? "L" : "M") + xy(p).map((n) => n.toFixed(1)).join(" ")).join(" ");
-      const first = pts[0], last = pts[pts.length - 1];
-      const change = Math.round((last[1] - first[1]) * 10) / 10;
-      out.innerHTML = `
-        <div class="stat-row">
-          <div class="stat"><div class="k">Latest</div><div class="v">${last[1].toFixed(1)}<small>kg</small></div></div>
-          <div class="stat"><div class="k">Change</div><div class="v">${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(1)}<small>kg</small></div></div>
-          <div class="stat"><div class="k">Readings</div><div class="v">${pts.length}</div></div>
-        </div>
-        ${pts.length > 1 ? `<div class="card-box"><svg class="w-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight over the last 90 days">
-          <path d="${line}" fill="none" stroke="var(--purple)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-          ${pts.map((p) => { const [x, y] = xy(p); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="var(--card)" stroke="var(--purple)" stroke-width="2"><title>${esc(prettyDate(p[0]))}: ${p[1].toFixed(1)} kg</title></circle>`; }).join("")}
-        </svg><div class="w-axis"><span>${esc(prettyDate(from))}</span><span>Today</span></div></div>` : ""}
-        <ul class="top-foods" style="margin-top:12px">${pts.slice().reverse().slice(0, 15).map(([k, v]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}</span><span>${v.toFixed(1)} kg</span></li>`).join("")}</ul>
-        <p class="note">Change is from your first reading in this period (${esc(prettyDate(first[0]))}).</p>`;
-    }).catch(() => { const out = $("#wOut"); if (out) out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; });
   },
 
   history(body) {
@@ -2030,7 +2238,7 @@ function bindEvents() {
   $("#fabScan").addEventListener("click", () => openSheet(null, "scan"));
   $("#fabManual").addEventListener("click", () => openSheet(null, "add"));
   $("#fabHistory").addEventListener("click", () => openSheet(null, "history"));
-  $("#fabSpend").addEventListener("click", () => openSheet(null, "spending"));
+  $("#fabStats").addEventListener("click", () => openSheet(null, "stats", "spend"));
   $("#photoInput").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     e.target.value = ""; // drop the reference to the photo
@@ -2042,10 +2250,19 @@ function bindEvents() {
     else { show("scan", null, false); toast("No barcode found in that photo. Try again closer up."); }
   });
 
-  $("#scrim").addEventListener("click", closeSheet);
-  $("#sheetClose").addEventListener("click", closeSheet);
+  $("#scrim").addEventListener("click", () => closeSheet({ keepDraft: true }));
+  $("#sheetClose").addEventListener("click", () => closeSheet({ keepDraft: true }));
+  // Remember which screen the typing happened on: by the time the save runs, another screen may be showing.
+  const queueDraft = () => {
+    const top = sheet.stack[sheet.stack.length - 1];
+    if (!top) return;
+    saveDraft(top[0], top[1]);
+  };
+  $("#sheetBody").addEventListener("input", (e) => { if (e.isTrusted) queueDraft(); });
+  $("#sheetBody").addEventListener("change", (e) => { if (e.isTrusted) queueDraft(); });
+  window.addEventListener("pagehide", () => { const top = sheet.stack[sheet.stack.length - 1]; if (sheetOpen() && top) saveDraft(top[0], top[1]); });
   $("#sheetBack").addEventListener("click", back);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetOpen()) closeSheet({ keepDraft: true }); });
   document.addEventListener("visibilitychange", () => { if (document.hidden) stopCamera(); });
 
   $("#mealTabs").addEventListener("click", (e) => {
@@ -2074,6 +2291,7 @@ function bindEvents() {
     else if (act === "custom-q") show("custom", { name: $("#q")?.value || "" });
     else if (act === "custom-barcode") show("custom", { barcode: actEl.dataset.code });
     else if (act === "quick") show("quick");
+    else if (act === "weight-stats") show("stats", "weight");
     else if (act === "about-data") show("aboutData");
     else if (act === "repeat") {
       const items = dayData(actEl.dataset.from)[sheet.meal];
