@@ -1114,7 +1114,7 @@ const VIEWS = {
       $("#nOpts", body).hidden = !enabled;
     });
     $("#nTest", body).addEventListener("click", async () => {
-      try { await showLocalNotification("Test from Grace's Calorie Tracker", "Notifications are working on this device."); }
+      try { await showLocalNotification("Test from Calorie Tracker", "Notifications are working on this device."); }
       catch { toast("Couldn't show a notification. Check the app's notification permission in your phone settings."); }
     });
     $("#nSave", body).addEventListener("click", async (e) => {

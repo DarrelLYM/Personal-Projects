@@ -1,6 +1,6 @@
 // Keeps the app shell available offline. Network first, so updates show up straight away.
 // Firebase keeps its own offline copy of your data.
-const CACHE = "gct-v2";
+const CACHE = "gct-v3";
 const SHELL = ["./", "./index.html", "./app.js", "./foods.js", "./firebase-config.js", "./manifest.json",
   "./vendor/zxing-browser.js", "./icons/icon-192.png", "./icons/apple-touch-icon.png"];
 self.addEventListener("install", (e) => {
@@ -26,7 +26,7 @@ self.addEventListener("push", (e) => {
   let p = {};
   try { p = e.data ? e.data.json() : {}; } catch { p = { data: { body: e.data && e.data.text() } }; }
   const d = p.data || p.notification || p;
-  const title = d.title || "Grace's Calorie Tracker";
+  const title = d.title || "Calorie Tracker";
   e.waitUntil(self.registration.showNotification(title, {
     body: d.body || "",
     icon: "icons/icon-192.png",
