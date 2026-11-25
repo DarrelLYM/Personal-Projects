@@ -1457,32 +1457,25 @@ async function runWeightStats() {
   $("#wsNext").disabled = wstat.offset >= 0;
   out.innerHTML = '<div class="spinner"></div>';
   let days;
-  // Also load the 60 days before, to find the starting weight when the first day of the period has no reading.
-  const before = new Date(a); before.setDate(a.getDate() - 60);
-  try { days = await loadRange(ymd(before), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; return; }
+  try { days = await loadRange(ymd(a), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; return; }
   if (!$("#wsOut")) return;
-  const allPts = days.filter(([, d]) => hasWeight(d)).map(([k, d]) => [k, d.weight]);
-  const pts = allPts.filter(([k]) => k >= ymd(a));
-  const earlier = allPts.filter(([k]) => k < ymd(a)).pop() || null;
-  if (!pts.length) { out.innerHTML = `<p class="muted">No weight readings ${wstat.period === "week" ? "this week" : "in this period"}. Log one from the Weight card on the main screen.</p>`; return; }
-  // Change = end of the chart (latest reading in the period) minus its start: the reading on the
-  // period's first day, or else the last reading before the period, or else the period's first reading.
-  const last = pts[pts.length - 1];
-  const start = pts[0][0] === ymd(a) ? pts[0] : earlier || pts[0];
-  const change = Math.round((last[1] - start[1]) * 10) / 10;
-  const short = (k) => prettyDate(k, { weekday: "short", day: "numeric", month: "short" });
+  const pts = days.filter(([, d]) => hasWeight(d)).map(([k, d]) => [k, d.weight]);
+  // Change only uses readings inside this chart: latest minus first. With none or one reading it's 0.
+  const first = pts[0], last = pts[pts.length - 1];
+  const change = pts.length > 1 ? Math.round((last[1] - first[1]) * 10) / 10 : 0;
   const dm = (k) => prettyDate(k, { day: "numeric", month: "short" });
-  const changeFrom = start === last ? "Only one reading" : `${dm(start[0])} → ${last[0] === todayKey() ? "today" : dm(last[0])}`;
-  const avgW = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  const changeFrom = pts.length > 1 ? `${dm(first[0])} → ${last[0] === todayKey() ? "today" : dm(last[0])}` : pts.length ? "Only one reading" : "No readings yet";
+  const avgW = pts.length ? pts.reduce((s, p) => s + p[1], 0) / pts.length : 0;
   out.innerHTML = `
     <div class="stat-row">
-      <div class="stat"><div class="k">Latest</div><div class="v">${last[1].toFixed(1)}<small>kg</small></div></div>
+      <div class="stat"><div class="k">Latest</div><div class="v">${pts.length ? `${last[1].toFixed(1)}<small>kg</small>` : "–"}</div></div>
       <div class="stat"><div class="k">Change</div><div class="v">${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(1)}<small>kg</small></div><div class="k2">${esc(changeFrom)}</div></div>
-      <div class="stat"><div class="k">Average</div><div class="v">${avgW.toFixed(1)}<small>kg</small></div></div>
+      <div class="stat"><div class="k">Average</div><div class="v">${pts.length ? `${avgW.toFixed(1)}<small>kg</small>` : "–"}</div></div>
     </div>
+    ${!pts.length ? `<p class="muted">No weight logged ${wstat.period === "week" ? "this week" : "in this period"} yet. Log it from the Weight card on the main screen.</p>` : `
     <div class="card-box">${weightChart(pts, a, b, wstat.period)}</div>
     <ul class="top-foods" style="margin-top:12px">${pts.slice().reverse().slice(0, 14).map(([k, v]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}</span><span>${v.toFixed(1)} kg</span></li>`).join("")}</ul>
-    <p class="note">${pts.length} reading${pts.length === 1 ? "" : "s"} in this period. Change compares the start of the chart with its latest reading${start === earlier ? ` (no reading on ${esc(short(ymd(a)))}, so it starts from your last reading before that, on ${esc(short(start[0]))})` : ""}.</p>`;
+    <p class="note">${pts.length} reading${pts.length === 1 ? "" : "s"} in this period. Change compares the first and latest weight in this chart.</p>`}`;
 }
 
 function renderStatTab(body) {
