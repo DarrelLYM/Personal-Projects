@@ -695,7 +695,7 @@ const tierTag = (f) => `<span class="tier tier-${esc(f.tier || "u")}">${esc(f.ti
 function resultItem(f, idx) {
   return `<li><button class="result" data-pick="${idx}">
     <div class="r-main"><div class="r-name">${esc(f.name)}${f.brand && !f.name.toLowerCase().includes(f.brand.toLowerCase()) ? ` <span class="r-brand">${esc(f.brand)}</span>` : ""}</div>
-    <div class="r-meta">${tierTag(f)} ${esc(f.serving)} · P ${fmt(num(f.protein))}g · C ${fmt(num(f.carbs))}g · F ${fmt(num(f.fat))}g${f.sugar == null ? "" : ` · S ${fmt(f.sugar)}g`}</div></div>
+    <div class="r-meta">${tierTag(f)} ${esc(f.serving)}${num(f.protein) || num(f.carbs) || num(f.fat) ? ` · P ${fmt(num(f.protein))}g · C ${fmt(num(f.carbs))}g · F ${fmt(num(f.fat))}g${f.sugar == null ? "" : ` · S ${fmt(f.sugar)}g`}` : ""}</div></div>
     <div class="r-kcal">${fmt(f.kcal)} kcal</div></button></li>`;
 }
 
