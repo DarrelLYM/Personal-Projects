@@ -127,6 +127,8 @@ async function loadFirebase() {
     signOut: auth.signOut,
     doc: (path) => fs.doc(db, path),
     getDoc: fs.getDoc, setDoc: fs.setDoc, deleteDoc: fs.deleteDoc, onSnapshot: fs.onSnapshot,
+    // Monthly summary docs (months/_s-YYYY-MM) carry "summaryOf" instead of "month", so month queries skip them.
+    listSummaries: () => fs.getDocs(fs.query(fs.collection(db, `${userPath()}/months`), fs.where("summaryOf", ">=", "0000-00"))),
     monthsBetween: (from, to) => fs.getDocs(fs.query(fs.collection(db, `${userPath()}/months`), fs.where("month", ">=", from), fs.where("month", "<=", to))),
   });
 }
@@ -213,6 +215,8 @@ function ensureMonthSubs() {
     if (state.monthSubs.has(m)) continue;
     const unsub = fb.onSnapshot(fb.doc(monthPath(m)), (snap) => {
       state.months[m] = { days: snap.exists() ? snap.data().days || {} : {}, fetchedAt: Date.now() };
+      // Keep this month's summary in step. Skip snapshots that may be an incomplete offline copy.
+      if (!snap.metadata.fromCache || snap.metadata.hasPendingWrites) saveSummary(m, state.months[m].days);
       renderAll(false);
     }, (e) => console.error(e));
     state.monthSubs.set(m, unsub);
@@ -226,6 +230,74 @@ function stopSubscriptions() {
   state.monthSubs.clear();
   state.months = {};
   state.profile = null;
+}
+
+// ---------- Monthly summaries ----------
+// Year and All-time views read these small per-month totals instead of every logged entry,
+// so they stay quick and light however many years of data there are.
+const SUMMARY_V = 1;
+const summaryPath = (m) => `${userPath()}/months/_s-${m}`;
+const summaryKnown = new Map(); // month -> JSON of the summary last saved from this device
+const fieldKey = (name) => String(name || "Unnamed").slice(0, 120).replace(/^__|__$/g, "_") || "Unnamed";
+const round2 = (v) => Math.round(v * 100) / 100;
+
+function summarizeMonth(month, days) {
+  const s = { summaryOf: month, v: SUMMARY_V, days: 0, kcal: 0, sugar: 0, foods: {}, spend: {}, spendN: {}, sfoods: {}, unpriced: 0 };
+  for (const d of Object.values(days || {})) {
+    const entries = MEALS.flatMap((m) => (Array.isArray(d?.[m.id]) ? d[m.id] : []));
+    if (!entries.length) continue;
+    s.days++;
+    const t = totalsOf(entries);
+    s.kcal += t.kcal; s.sugar += t.sugar;
+    for (const e of entries) {
+      const k = fieldKey(e.name);
+      s.foods[k] = (s.foods[k] || 0) + 1;
+      if (hasPrice(e)) {
+        const ty = spendType(e), p = num(e.price);
+        s.spend[ty] = round2((s.spend[ty] || 0) + p);
+        s.spendN[ty] = (s.spendN[ty] || 0) + 1;
+        const f = s.sfoods[k] || [0, 0, ty];
+        f[0] = round2(f[0] + p); f[1]++;
+        s.sfoods[k] = f;
+      } else s.unpriced++;
+    }
+  }
+  s.kcal = Math.round(s.kcal); s.sugar = Math.round(s.sugar * 10) / 10;
+  // Keep each month's lists short: the 30 most eaten and 20 biggest spends.
+  s.foods = Object.fromEntries(Object.entries(s.foods).sort((a, b) => b[1] - a[1]).slice(0, 30));
+  s.sfoods = Object.fromEntries(Object.entries(s.sfoods).sort((a, b) => b[1][0] - a[1][0]).slice(0, 20));
+  return s;
+}
+
+function saveSummary(month, days) {
+  if (!state.user) return Promise.resolve();
+  const s = summarizeMonth(month, days);
+  const json = JSON.stringify(s);
+  if (summaryKnown.get(month) === json) return Promise.resolve();
+  summaryKnown.set(month, json);
+  const path = summaryPath(month);
+  return queueWrite(path, () => fb.setDoc(fb.doc(path), s)).catch((e) => { summaryKnown.delete(month); console.error(e); });
+}
+
+// Builds every month's summary from the full log (once per account, and after restoring a backup).
+let rebuilding = null;
+function rebuildSummaries() {
+  if (!rebuilding) {
+    rebuilding = (async () => {
+      const months = await allMonths();
+      const out = [];
+      for (const [m, doc] of months) { const sm = summarizeMonth(m, doc.days); out.push(sm); summaryKnown.delete(m); await saveSummary(m, doc.days); }
+      await updateProfile({ summaryV: SUMMARY_V });
+      return out;
+    })().finally(() => { rebuilding = null; });
+  }
+  return rebuilding;
+}
+
+async function loadSummaries() {
+  if (state.profile?.summaryV !== SUMMARY_V) return rebuildSummaries();
+  const snap = await fb.listSummaries();
+  return snap.docs.map((d) => d.data()).filter((x) => x && x.summaryOf).sort((a, b) => a.summaryOf.localeCompare(b.summaryOf));
 }
 
 // History: read every month document in a range with one query.
@@ -1214,11 +1286,21 @@ async function runHistory() {
   if (!out) return;
   out.innerHTML = '<div class="spinner"></div>';
   const [start, end] = rangeDates(hist.range);
-  let days;
-  try { days = await loadRange(start, end); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your history. Check your connection.</p>'; return; }
+  const q = hist.query.trim().toLowerCase();
+  // Long ranges without a search use the monthly summaries for the totals, plus the last
+  // few months in full for the day-by-day list. Searching still has to read every entry.
+  const useSums = !q && daysBetween(parseYmd(start), parseYmd(end)) > 92;
+  let days, sums = null;
+  try {
+    if (useSums) {
+      const t = new Date();
+      const recent = ymd(new Date(t.getFullYear(), t.getMonth() - 2, 1));
+      [days, sums] = await Promise.all([loadRange(recent > start ? recent : start, end), loadSummaries()]);
+      sums = sums.filter((sm) => sm.summaryOf >= monthOf(start) && sm.summaryOf <= monthOf(end));
+    } else days = await loadRange(start, end);
+  } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your history. Check your connection.</p>'; return; }
   if (!$("#histOut")) return;
   const logged = days.filter(([, d]) => MEALS.some((m) => (d[m.id] || []).length));
-  const q = hist.query.trim().toLowerCase();
   if (q) {
     const words = q.split(/\s+/);
     const hits = [];
@@ -1241,18 +1323,21 @@ async function runHistory() {
         : `<p class="muted">No foods matching “${esc(hist.query)}” in this period.</p>`}`;
     return;
   }
-  if (!logged.length) { out.innerHTML = '<p class="muted">Nothing logged in this period yet.</p>'; return; }
+  const sumDays = sums ? sums.reduce((n, sm) => n + (sm.days || 0), 0) : 0;
+  if (!logged.length && !sumDays) { out.innerHTML = '<p class="muted">Nothing logged in this period yet.</p>'; return; }
   const totals = logged.map(([date, d]) => [date, totalsOf(MEALS.flatMap((m) => d[m.id] || []))]);
-  const avg = (k) => totals.reduce((s, [, t]) => s + t[k], 0) / totals.length;
+  const nDays = sums ? sumDays : totals.length;
+  const avg = (k) => (sums ? sums.reduce((s, sm) => s + (sm[k] || 0), 0) / Math.max(1, sumDays) : totals.reduce((s, [, t]) => s + t[k], 0) / totals.length);
   const g = goals();
   const counts = new Map();
-  for (const [, d] of logged) for (const m of MEALS) for (const e of d[m.id] || []) counts.set(e.name, (counts.get(e.name) || 0) + 1);
+  if (sums) { for (const sm of sums) for (const [name, n] of Object.entries(sm.foods || {})) counts.set(name, (counts.get(name) || 0) + n); }
+  else for (const [, d] of logged) for (const m of MEALS) for (const e of d[m.id] || []) counts.set(e.name, (counts.get(e.name) || 0) + 1);
   const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  const showBars = totals.length > 1 && totals.length <= 92;
+  const showBars = !sums && totals.length > 1 && totals.length <= 92;
   const maxK = Math.max(g.kcal, ...totals.map(([, t]) => t.kcal));
   out.innerHTML = `
     <div class="stat-row">
-      <div class="stat"><div class="k">Days logged</div><div class="v">${totals.length}</div></div>
+      <div class="stat"><div class="k">Days logged</div><div class="v">${nDays}</div></div>
       <div class="stat"><div class="k">Avg calories</div><div class="v">${fmt(avg("kcal"))}</div></div>
       <div class="stat"><div class="k">Avg sugar</div><div class="v">${fmt(avg("sugar"))}<small>g</small></div></div>
     </div>
@@ -1334,83 +1419,99 @@ async function runSpending() {
   const range = periodRange(spend.period, spend.offset);
   const [a, b] = range;
   const aKey = ymd(a), bKey = ymd(b);
+  const isYear = spend.period === "year", isMonth = spend.period === "month";
   $("#spendLabel").textContent = periodLabel(spend.period, spend.offset, range);
   $("#spendNext").disabled = spend.offset >= 0;
   out.innerHTML = '<div class="spinner"></div>';
-  // Load the whole chart's span: the week for Week, the year for Month, every year for Year.
-  let days;
+  // Day, Week and Month details read that period's entries. The Month and Year charts, and the
+  // Year details, use the small monthly summaries instead of downloading every entry.
+  let days = [], sums = [];
   try {
-    if (spend.period === "year") days = (await allMonths()).flatMap(([, m]) => Object.entries(m.days || {}));
-    else if (spend.period === "month") days = await loadRange(`${a.getFullYear()}-01-01`, `${a.getFullYear()}-12-31`);
-    else days = await loadRange(aKey, bKey);
+    [days, sums] = await Promise.all([isYear ? [] : loadRange(aKey, bKey), isYear || isMonth ? loadSummaries() : []]);
   } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your spending. Check your connection.</p>'; return; }
   if (!$("#spendOut")) return;
-  const ctx = [];
-  let unpriced = 0;
-  for (const [date, d] of days) for (const m of MEALS) for (const e of d[m.id] || []) {
-    const inPeriod = date >= aKey && date <= bKey;
-    if (hasPrice(e)) ctx.push({ date, meal: m.id, e, price: num(e.price), type: spendType(e), inPeriod });
-    else if (inPeriod) unpriced++;
-  }
-  const typed = (list) => (spend.filter === "all" ? list : list.filter((x) => x.type === spend.filter));
-  const all = ctx.filter((x) => x.inPeriod);
-  const items = typed(all);
-  const chartItems = typed(ctx);
-  const total = items.reduce((s, x) => s + x.price, 0);
-  const sum = (pred) => chartItems.filter(pred).reduce((s, x) => s + x.price, 0);
+  const passes = (ty) => spend.filter === "all" || ty === spend.filter;
 
+  // Period totals: by type (all types), top foods and count (filtered), unpriced.
+  const byTypeMap = {}, countMap = {}, foodMap = new Map();
+  let unpriced = 0;
+  const addFood = (name, v, n, ty) => { if (!passes(ty)) return; const f = foodMap.get(name) || { name, v: 0, n: 0 }; f.v += v; f.n += n; foodMap.set(name, f); };
+  const entries = [];
+  if (isYear) {
+    for (const sm of sums) {
+      if (sm.summaryOf.slice(0, 4) !== String(a.getFullYear())) continue;
+      unpriced += sm.unpriced || 0;
+      for (const [ty, v] of Object.entries(sm.spend || {})) { byTypeMap[ty] = (byTypeMap[ty] || 0) + v; countMap[ty] = (countMap[ty] || 0) + (sm.spendN?.[ty] || 0); }
+      for (const [name, [v, n, ty]] of Object.entries(sm.sfoods || {})) addFood(name, v, n, ty);
+    }
+  } else {
+    for (const [date, d] of days) for (const m of MEALS) for (const e of d[m.id] || []) {
+      if (!hasPrice(e)) { unpriced++; continue; }
+      const ty = spendType(e), p = num(e.price);
+      byTypeMap[ty] = (byTypeMap[ty] || 0) + p; countMap[ty] = (countMap[ty] || 0) + 1;
+      addFood(e.name, p, 1, ty);
+      entries.push({ date, meal: m.id, price: p, type: ty });
+    }
+  }
+  const byType = SPEND_TYPES.map((ty) => ({ ...ty, v: byTypeMap[ty.id] || 0, n: countMap[ty.id] || 0 })).filter((ty) => ty.v > 0).sort((p, q) => q.v - p.v);
+  const allTotal = byType.reduce((s, ty) => s + ty.v, 0);
+  const shown = byType.filter((ty) => passes(ty.id));
+  const total = shown.reduce((s, ty) => s + ty.v, 0);
+  const count = shown.reduce((s, ty) => s + ty.n, 0);
+  const top = [...foodMap.values()].sort((p, q) => q.v - p.v).slice(0, 8);
+
+  // Chart buckets
+  const sumEntries = (pred) => entries.filter((x) => passes(x.type) && pred(x)).reduce((s, x) => s + x.price, 0);
+  const sumMonths = (pred) => sums.filter((sm) => pred(sm.summaryOf)).reduce((s, sm) => s + Object.entries(sm.spend || {}).reduce((t, [ty, v]) => t + (passes(ty) ? v : 0), 0), 0);
   let buckets, chartTitle, avg = "";
   const t = today0(), todayK = todayKey();
   if (spend.period === "day") {
     chartTitle = "By meal";
-    buckets = MEALS.map((m) => ({ label: m.name, v: sum((x) => x.meal === m.id) }));
+    buckets = MEALS.map((m) => ({ label: m.name, v: sumEntries((x) => x.meal === m.id) }));
   } else if (spend.period === "week") {
     chartTitle = "By day";
     buckets = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(a); d.setDate(a.getDate() + i);
       const k = ymd(d);
-      buckets.push({ label: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()], title: prettyDate(k), v: sum((x) => x.date === k), on: k === todayK,
+      buckets.push({ label: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()], title: prettyDate(k), v: sumEntries((x) => x.date === k), on: k === todayK,
         jump: d <= t ? `day:${daysBetween(t, d)}` : "" });
     }
     avg = `avg ${money(total / 7)} a day`;
-  } else if (spend.period === "month") {
-    chartTitle = `Every month of ${a.getFullYear()}`;
+  } else if (isMonth) {
+    const y = a.getFullYear();
+    chartTitle = `Every month of ${y}`;
     buckets = MON.map((label, i) => {
-      const first = new Date(a.getFullYear(), i, 1);
-      const o = (first.getFullYear() - t.getFullYear()) * 12 + (i - t.getMonth());
-      return { label: label.charAt(0), title: `${label} ${a.getFullYear()}`, v: sum((x) => +x.date.slice(5, 7) === i + 1), on: i === a.getMonth(), jump: o <= 0 ? `month:${o}` : "" };
+      const key = `${y}-${String(i + 1).padStart(2, "0")}`;
+      const o = (y - t.getFullYear()) * 12 + (i - t.getMonth());
+      // The selected month's bar uses its full entries, so it always matches the total above.
+      const v = i === a.getMonth() ? total : sumMonths((m) => m === key);
+      return { label: label.charAt(0), title: `${label} ${y}`, v, on: i === a.getMonth(), jump: o <= 0 ? `month:${o}` : "" };
     });
-    const ytd = buckets.filter((bk, i) => new Date(a.getFullYear(), i, 1) <= t);
+    const ytd = buckets.filter((bk, i) => new Date(y, i, 1) <= t);
     if (ytd.length) avg = `avg ${money(ytd.reduce((s, bk) => s + bk.v, 0) / ytd.length)} a month`;
   } else {
     chartTitle = "Every year";
-    const years = ctx.map((x) => +x.date.slice(0, 4));
+    const years = sums.map((sm) => +sm.summaryOf.slice(0, 4));
     const cur = t.getFullYear();
     let y0 = Math.min(cur - 2, a.getFullYear(), ...years);
     y0 = Math.max(y0, cur - 9);
     buckets = [];
-    for (let y = y0; y <= cur; y++) buckets.push({ label: String(y), title: String(y), v: sum((x) => +x.date.slice(0, 4) === y), on: y === a.getFullYear(), jump: `year:${y - cur}` });
+    for (let y = y0; y <= cur; y++) buckets.push({ label: String(y), title: String(y), v: sumMonths((m) => m.startsWith(y + "-")), on: y === a.getFullYear(), jump: `year:${y - cur}` });
   }
   const filterColor = spend.filter === "all" ? "" : SPEND_TYPES.find((x) => x.id === spend.filter).color;
-
-  const byType = SPEND_TYPES.map((ty) => ({ ...ty, v: all.filter((x) => x.type === ty.id).reduce((s, x) => s + x.price, 0), n: all.filter((x) => x.type === ty.id).length })).filter((ty) => ty.v > 0).sort((p, q) => q.v - p.v);
-  const allTotal = byType.reduce((s, ty) => s + ty.v, 0);
-  const foods = new Map();
-  for (const x of items) { const f = foods.get(x.e.name) || { name: x.e.name, v: 0, n: 0 }; f.v += x.price; f.n++; foods.set(x.e.name, f); }
-  const top = [...foods.values()].sort((p, q) => q.v - p.v).slice(0, 8);
   const hasChart = buckets.some((bk) => bk.v > 0);
 
   $("#spendTotal").textContent = money(total);
-  $("#spendSub").textContent = `${spend.filter === "all" ? "" : spendTypeName(spend.filter) + " · "}${items.length} item${items.length === 1 ? "" : "s"} with a price`;
+  $("#spendSub").textContent = `${spend.filter === "all" ? "" : spendTypeName(spend.filter) + " · "}${count} item${count === 1 ? "" : "s"} with a price`;
   out.innerHTML = `
     ${hasChart ? `<div class="card-box"><div class="box-head"><span>${esc(chartTitle)}</span><small>${esc(avg)}</small></div>${barChart(buckets, filterColor)}
       ${buckets.some((bk) => bk.jump) ? '<p class="chart-hint">Tap a bar to open that ' + (spend.period === "week" ? "day" : spend.period) + ".</p>" : ""}</div>` : ""}
-    ${!all.length ? `<p class="muted">No prices logged ${spend.period === "day" ? "on this day" : "in this period"}. Add a price when you log food, or tap a logged food to add one.</p>` : `
+    ${!byType.length ? `<p class="muted">No prices logged ${spend.period === "day" ? "on this day" : "in this period"}. Add a price when you log food, or tap a logged food to add one.</p>` : `
     <div class="card-box">
       <div class="box-head"><span>By type of food</span><small>tap to filter</small></div>
-      <div class="type-stack">${byType.map((ty) => `<i style="flex:${ty.v};background:${ty.color};opacity:${spend.filter === "all" || spend.filter === ty.id ? 1 : 0.25}"></i>`).join("")}</div>
-      <div class="type-list">${byType.map((ty) => `<button data-type="${ty.id}" class="${spend.filter !== "all" && spend.filter !== ty.id ? "dim" : ""}">
+      <div class="type-stack">${byType.map((ty) => `<i style="flex:${ty.v};background:${ty.color};opacity:${passes(ty.id) ? 1 : 0.25}"></i>`).join("")}</div>
+      <div class="type-list">${byType.map((ty) => `<button data-type="${ty.id}" class="${passes(ty.id) ? "" : "dim"}">
         <span class="tn"><i style="background:${ty.color}"></i>${esc(ty.name)}</span><span class="tv">${money(ty.v)}</span>
         <span class="tt"><i style="width:${(ty.v / allTotal) * 100}%;background:${ty.color}"></i></span>
         <span class="ts">${Math.round((ty.v / allTotal) * 100)}% · ${ty.n} item${ty.n === 1 ? "" : "s"}</span></button>`).join("")}</div>
@@ -1418,7 +1519,7 @@ async function runSpending() {
     <div class="section-label">Top spends</div>
     ${top.length ? `<ul class="top-foods">${top.map((f) => `<li><span>${esc(f.name)}${f.n > 1 ? ` <small>× ${f.n}</small>` : ""}</span><span>${money(f.v)}</span></li>`).join("")}</ul>` : '<p class="muted">Nothing of this type in this period.</p>'}`}
     ${unpriced ? `<p class="note">${unpriced} logged item${unpriced === 1 ? "" : "s"} in this period ha${unpriced === 1 ? "s" : "ve"} no price and ${unpriced === 1 ? "isn't" : "aren't"} counted. Tap a food on the main screen to add its price.</p>` : ""}
-    ${all.length ? '<p class="note">The type of food is guessed from where the food comes from. To change it, tap the food on the main screen and pick a different type.</p>' : ""}`;
+    ${byType.length ? '<p class="note">The type of food is guessed from where the food comes from. To change it, tap the food on the main screen and pick a different type.</p>' : ""}`;
 }
 
 // Weight line chart with a kg scale on the left.
@@ -2429,6 +2530,8 @@ async function boot() {
 
 // ---------- After sign-in housekeeping ----------
 async function afterProfileLoad() {
+  // One-time: build the monthly summaries for data logged before they existed.
+  if (state.profile?.summaryV !== SUMMARY_V) rebuildSummaries().catch((e) => console.error(e));
   // Email changed through a confirmation link: keep the profile and username lookup in step.
   const email = state.user?.email;
   const p = state.profile;
@@ -2611,7 +2714,7 @@ function saveFile(name, text, type) {
 
 async function allMonths() {
   const snap = await fb.listMonths();
-  return snap.docs.map((d) => [d.id, d.data()]).sort((a, b) => a[0].localeCompare(b[0]));
+  return snap.docs.filter((d) => /^\d{4}-\d{2}$/.test(d.id)).map((d) => [d.id, d.data()]).sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 async function exportCsv() {
@@ -2659,7 +2762,10 @@ function parseBackup(text) {
 async function restoreBackup(b) {
   for (const [month, v] of Object.entries(b.months)) {
     const days = {};
-    for (const [date, day] of Object.entries(v.days)) days[date] = Object.fromEntries(MEALS.map((m) => [m.id, Array.isArray(day?.[m.id]) ? day[m.id] : []]));
+    for (const [date, day] of Object.entries(v.days)) {
+      days[date] = Object.fromEntries(MEALS.map((m) => [m.id, Array.isArray(day?.[m.id]) ? day[m.id] : []]));
+      if (typeof day?.weight === "number" && day.weight > 0) days[date].weight = day.weight;
+    }
     const path = monthPath(month);
     await queueWrite(path, () => fb.setDoc(fb.doc(path), { month, days, updatedAt: new Date().toISOString() }, { merge: true }));
   }
@@ -2675,6 +2781,7 @@ async function restoreBackup(b) {
   for (const unsub of state.monthSubs.values()) unsub();
   state.monthSubs.clear();
   renderAll();
+  rebuildSummaries().catch((e) => console.error(e));
 }
 
 // ---------- Notifications ----------

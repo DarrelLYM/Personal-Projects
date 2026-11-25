@@ -85,6 +85,7 @@ To add a food permanently for everyone, add it to `scripts/foods/sources/estimat
 | Logins (email and password) | Firebase Authentication. Passwords are stored by Google in hashed form; nobody can read them, including you |
 | Profile (username, goals, saved foods, notification settings and device tokens) | Firestore `users/{userId}` |
 | Food log | Firestore `users/{userId}/months/{YYYY-MM}`: one document per month, so 10 years is about 120 per person |
+| Monthly summaries | Firestore `users/{userId}/months/_s-{YYYY-MM}`: small per-month totals (days logged, calories, sugar, most-eaten foods, spending by type, top spends), kept up to date by the app whenever a month changes. Statistics → Month/Year and History → This year/All time read these instead of every entry, so they download a few dozen KB even after 10 years. Built once automatically for older data (and again after restoring a backup) |
 | Username lookup | Firestore `usernames/{name}`, which maps a username to its email so people can sign in with either |
 | App code | This repo, served by GitHub Pages |
 
