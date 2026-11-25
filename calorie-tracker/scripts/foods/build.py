@@ -5,6 +5,7 @@ Sources (each food keeps a tier and a source label):
   hpb.json            HPB Singapore Food Insights Database (SG FoodID). Official ("o").
   mcdonalds-sg.json   McDonald's Singapore nutrition facts (mcdonalds.com.sg). Official ("o").
   yakun-drinks.json   Ya Kun Nutrition Information Panel (per 100ml). Official ("o").
+  subway-sg.json      Subway Singapore nutrition guide (Feb 2022). Official ("o").
   estimates.json      Chains with no published data. Estimate ("e").
 
 Run:  python3 scripts/foods/build.py
@@ -149,6 +150,33 @@ for x in yk["items"]:
     items.append(rec); n_yk += 1
 counts["yakun"] = n_yk
 
+# ---------- Subway Singapore ----------
+sw = load("subway-sg.json")
+UNIT = {"6-inch sub": "1 sub", "breakfast 6-inch sub": "1 sub", "wrap": "1 wrap", "flatbread": "1 flatbread", "breakfast flatbread": "1 flatbread",
+        "breakfast 3-inch flatbread": "1 mini flatbread", "salad": "1 salad", "toastie": "1 toastie", "soup": "1 bowl", "side": "1 serving",
+        "cookie": "1 cookie", "add-on": "1 portion"}
+for x in sw["items"]:
+    grp = x["group"]
+    if grp in ("6-inch sub", "breakfast 6-inch sub"):
+        name = f"{x['name']} ({'breakfast ' if grp.startswith('breakfast') else ''}6-inch sub)"
+    elif grp == "add-on":
+        name = f"{x['name']} (add-on)"
+    elif grp in ("side", "cookie"):
+        name = x["name"] + (" cookie" if grp == "cookie" else "")
+    else:
+        name = f"{x['name']} ({grp})"
+    kind = "" if grp == "add-on" else "snack" if grp in ("side", "cookie") else "meal"
+    rec = {"i": "sw-" + re.sub(r"[^a-z0-9]+", "-", (grp + " " + x["name"]).lower()).strip("-"), "n": name, "b": "Subway", "c": "Restaurants", "g": "Subway",
+           "d": "sandwich" + (" sauce" if "Sauce" in x["name"] else ""), "s": f"{UNIT[grp]} ({'%g' % x['grams']}g)", "w": x["grams"],
+           "k": x["kcal"], "p": x["protein"], "cb": x["carbs"], "f": x["fat"], "su": x["sugar"], "na": x["sodium"], "t": "o", "src": "subway",
+           "sn": "Feb 2022 guide" + ("; excludes sauce and cheese" if grp in ("6-inch sub", "wrap", "flatbread", "salad") else ""), "kd": kind}
+    if grp == "6-inch sub":
+        rec["alt"] = [["Footlong (2 × 6-inch)", x["grams"] * 2]]
+    if grp.startswith("breakfast") or grp == "toastie":
+        rec["bf"] = 1
+    items.append(rec)
+counts["subway"] = len(sw["items"])
+
 # ---------- Estimates ----------
 est = load("estimates.json")
 for x in est:
@@ -174,6 +202,7 @@ out = {
         "hpb": {"label": "HPB SG FoodID", "url": "https://pphtpc.hpb.gov.sg/web/sgfoodid"},
         "mcd": {"label": "McDonald's Singapore", "url": "https://www.mcdonalds.com.sg/nutrition-calculator"},
         "yakun": {"label": "Ya Kun nutrition panel", "url": "https://app.yakun.com/nutritional-information"},
+        "subway": {"label": "Subway Singapore nutrition guide", "url": "https://subwayisfresh.com.sg/wp-content/uploads/2022/02/Singapore-Nutrition-Information-Webguide-Feb-2022.pdf"},
         "est": {"label": "Estimate", "note": "No official data published"},
     },
     "items": items,
