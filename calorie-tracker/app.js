@@ -2298,7 +2298,18 @@ async function sendReset(email) {
   catch (e) { if (String(e?.code).includes("continue-uri") || e?.code === "auth/unauthorized-domain") await fb.sendReset(fb.auth, email); else throw e; }
 }
 
+// Re-renders a sign-in screen. What was typed (except passwords) is kept, so an error message
+// doesn't wipe the username; the username/email also carries over between Sign in and Forgot password.
 function authView(view, msg) {
+  const typed = {};
+  $("#authCard")?.querySelectorAll("input[id]").forEach((el) => { if (el.type !== "password") typed[el.id] = el.value; });
+  const login = typed.aLogin ?? typed.fLogin;
+  if (login !== undefined) { typed.aLogin ??= login; typed.fLogin ??= login; }
+  renderAuthView(view, msg);
+  for (const [id, v] of Object.entries(typed)) { const el = $("#" + id); if (el && !el.value && v) el.value = v; }
+}
+
+function renderAuthView(view, msg) {
   const card = $("#authCard");
   const message = msg ? `<p class="form-msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</p>` : "";
   if (view === "signin") {
