@@ -477,8 +477,8 @@ function renderMeals() {
 // Stored on the day as wAm (day) and wPm (night). Readings saved before there were two count as the day reading.
 // Each day's figure for charts and comparisons depends on the chosen mode: the average of the two (or the
 // only one logged), the lower, or the higher.
-const WMODES = [["avg", "Average"], ["low", "Lower"], ["high", "Higher"]];
-const WMODE_TEXT = { avg: "the average of day and night (or the only one logged)", low: "the lower of day and night", high: "the higher of day and night" };
+const WMODES = [["avg", "Average"], ["low", "Lowest"], ["high", "Highest"]];
+const WMODE_TEXT = { avg: "the average of day and night (or the only one logged)", low: "the lowest of day and night", high: "the highest of day and night" };
 const weightMode = () => (WMODES.some(([k]) => k === state.profile?.weightMode) ? state.profile.weightMode : "avg");
 const validW = (v) => typeof v === "number" && v > 0;
 function readings(d) {
@@ -1434,6 +1434,43 @@ function barChart(buckets, color) {
   </div>`;
 }
 
+// Month view of weight: four bars (days 1–7, 8–14, 15–21, 22–end). Each bar uses every weight recorded
+// that week: Average = the average of them all, Lowest = the lowest, Highest = the highest.
+// The kg scale starts near the lowest value so small changes are visible.
+function weightWeekBars(pts, a, b, mode) {
+  const end = b.getDate();
+  const weeks = [[1, 7], [8, 14], [15, 21], [22, end]].map(([d0, d1]) => {
+    const all = pts.filter(([k]) => { const n = +k.slice(8, 10); return n >= d0 && n <= d1; })
+      .flatMap(([, , r]) => [r.am, r.pm].filter((x) => x !== null));
+    const vals = !all.length ? [] : mode === "low" ? [Math.min(...all)] : mode === "high" ? [Math.max(...all)] : all;
+    const mid = new Date(a.getFullYear(), a.getMonth(), Math.min(d0 + 3, d1));
+    const o = Math.round((weekStart(mid) - weekStart(today0())) / (7 * 86400000));
+    return { label: `${d0}–${d1}`, v: vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null, n: all.length, jump: mid <= today0() ? o : null };
+  });
+  const have = weeks.filter((w) => w.v !== null).map((w) => w.v);
+  let lo = Math.min(...have), hi = Math.max(...have);
+  if (hi - lo < 1) { const m = (hi + lo) / 2; lo = m - 0.5; hi = m + 0.5; }
+  const step = [0.5, 1, 2, 5, 10, 20].find((st) => (hi - lo) / st <= 2) || 20;
+  lo = Math.floor(lo / step) * step - step; hi = Math.ceil(hi / step) * step;
+  const ticks = [];
+  for (let t = lo; t <= hi + 1e-9; t += step) ticks.push(Math.round(t * 10) / 10);
+  const pct = (v) => ((v - lo) / (hi - lo)) * 100;
+  return `<div class="vchart">
+    <div class="yaxis">${ticks.map((t) => `<span style="bottom:${pct(t)}%">${t % 1 ? t.toFixed(1) : t}</span>`).join("")}</div>
+    <div class="plot">
+      ${ticks.map((t) => `<i class="grid" style="bottom:${pct(t)}%"></i>`).join("")}
+      <div class="cols">${weeks.map((w) => {
+        const tag = w.jump !== null ? "button" : "div";
+        const h = w.v === null ? 0 : Math.max(2, pct(w.v));
+        return `<${tag} class="col"${w.jump !== null ? ` data-wjump="${w.jump}"` : ""} title="${esc(w.label)}: ${w.v === null ? "no weight" : w1(w.v) + " kg, from " + w.n + " reading" + (w.n === 1 ? "" : "s")}">
+          ${w.v !== null ? `<em style="bottom:calc(${h}% + 2px)">${w1(w.v)}</em>` : ""}
+          <i style="height:${h}%"></i>
+          <span class="xl">${esc(w.label)}</span></${tag}>`;
+      }).join("")}</div>
+    </div>
+  </div>`;
+}
+
 async function runSpending() {
   const out = $("#spendOut");
   if (!out) return;
@@ -1597,7 +1634,9 @@ async function runWeightStats() {
       <div class="stat"><div class="k">Average</div><div class="v">${pts.length ? `${w1(avgW)}<small>kg</small>` : "–"}</div></div>
     </div>
     ${!pts.length ? `<p class="muted">No weight logged ${wstat.period === "week" ? "this week" : "in this period"} yet. Log it from the Weight card on the main screen.</p>` : `
-    <div class="card-box">${weightChart(pts, a, b, wstat.period)}</div>
+    ${wstat.period === "month"
+      ? `<div class="card-box"><div class="box-head"><span>${{ avg: "Average weight each week", low: "Lowest weight each week", high: "Highest weight each week" }[mode]}</span><small>kg</small></div>${weightWeekBars(pts, a, b, mode)}<p class="chart-hint">Tap a bar to open that week.</p></div>`
+      : `<div class="card-box">${weightChart(pts, a, b, wstat.period)}</div>`}
     <ul class="top-foods w-list" style="margin-top:12px">${pts.slice().reverse().slice(0, 14).map(([k, v, r]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}<small>${r.am !== null ? `Day ${w1(r.am)}` : ""}${r.am !== null && r.pm !== null ? " · " : ""}${r.pm !== null ? `Night ${w1(r.pm)}` : ""}</small></span><span>${w1(v)} kg</span></li>`).join("")}</ul>
     <p class="note">${pts.length} day${pts.length === 1 ? "" : "s"} with a weight in this period. Each day counts as ${WMODE_TEXT[mode]}. Change compares the first and latest day in this chart.</p>`}`;
 }
@@ -1627,6 +1666,13 @@ function renderStatTab(body) {
       if (state.profile) state.profile.weightMode = b.dataset.mode;
       runWeightStats();
       renderWeight();
+    });
+    $("#wsOut", box).addEventListener("click", (e) => {
+      const j = e.target.closest("[data-wjump]");
+      if (!j) return;
+      wstat.period = "week"; wstat.offset = +j.dataset.wjump;
+      box.querySelectorAll("#wsPeriod button").forEach((x) => x.classList.toggle("on", x.dataset.period === "week"));
+      runWeightStats();
     });
     $("#wsPrev", box).addEventListener("click", () => { wstat.offset--; runWeightStats(); });
     $("#wsNext", box).addEventListener("click", () => { if (wstat.offset < 0) { wstat.offset++; runWeightStats(); } });
