@@ -152,7 +152,7 @@ function dayData(dateKey) {
   const d = state.months[monthOf(dateKey)]?.days?.[dateKey] || {};
   const out = {};
   for (const meal of MEALS) out[meal.id] = Array.isArray(d[meal.id]) ? d[meal.id] : [];
-  if (d.weight !== undefined) out.weight = d.weight;
+  for (const k of ["weight", "wAm", "wPm"]) if (d[k] !== undefined) out[k] = d[k];
   return out;
 }
 
@@ -473,33 +473,54 @@ function renderMeals() {
   $("#meals").innerHTML = html;
 }
 
-// ---------- Weight (optional, one reading per day, in kg) ----------
-const hasWeight = (d) => d && typeof d.weight === "number" && d.weight > 0;
-function setWeight(dateKey, kg) {
-  const day = dayData(dateKey);
-  return writeDay(dateKey, { ...day, weight: kg === null ? null : Math.round(kg * 10) / 10 });
+// ---------- Weight (optional: a day and a night reading, in kg) ----------
+// Stored on the day as wAm (day) and wPm (night). Readings saved before there were two count as the day reading.
+// Each day's figure for charts and comparisons depends on the chosen mode: the average of the two (or the
+// only one logged), the lower, or the higher.
+const WMODES = [["avg", "Average"], ["low", "Lower"], ["high", "Higher"]];
+const WMODE_TEXT = { avg: "the average of day and night (or the only one logged)", low: "the lower of day and night", high: "the higher of day and night" };
+const weightMode = () => (WMODES.some(([k]) => k === state.profile?.weightMode) ? state.profile.weightMode : "avg");
+const validW = (v) => typeof v === "number" && v > 0;
+function readings(d) {
+  return { am: validW(d?.wAm) ? d.wAm : validW(d?.weight) ? d.weight : null, pm: validW(d?.wPm) ? d.wPm : null };
 }
-// Latest reading before a date, from the months already loaded on this device.
+function dailyWeight(d, mode = weightMode()) {
+  const { am, pm } = readings(d);
+  const v = [am, pm].filter((x) => x !== null);
+  if (!v.length) return null;
+  return mode === "low" ? Math.min(...v) : mode === "high" ? Math.max(...v) : v.reduce((a, b) => a + b, 0) / v.length;
+}
+const hasWeight = (d) => dailyWeight(d) !== null;
+const r1w = (v) => (v === null ? null : Math.round(v * 10) / 10);
+// One decimal, rounding halves up (toFixed alone shows 55.55 as 55.5).
+const w1 = (v) => (Math.round(v * 10 + 1e-9) / 10).toFixed(1);
+function setWeights(dateKey, am, pm) {
+  const day = dayData(dateKey);
+  return writeDay(dateKey, { ...day, wAm: r1w(am), wPm: r1w(pm), weight: null });
+}
+// Latest day before a date with a weight, from the months already loaded on this device.
 function previousWeight(dateKey) {
   let best = null;
   for (const m of Object.values(state.months)) for (const [k, d] of Object.entries(m?.days || {})) {
-    if (k < dateKey && hasWeight(d) && (!best || k > best[0])) best = [k, d.weight];
+    if (k < dateKey && hasWeight(d) && (!best || k > best[0])) best = [k, dailyWeight(d)];
   }
   return best;
 }
-const kg = (v) => `${(Math.round(v * 10) / 10).toFixed(1)} kg`;
+const kg = (v) => `${w1(v)} kg`;
 
 function renderWeight() {
   const sel = ymd(state.selectedDate);
   const d = dayData(sel);
   const prev = previousWeight(sel);
   let main, sub;
+  const { am, pm } = readings(d);
   if (hasWeight(d)) {
-    main = kg(d.weight);
+    main = [am !== null ? `Day ${w1(am)}` : "", pm !== null ? `Night ${w1(pm)}` : ""].filter(Boolean).join(" · ") + " kg";
+    const today = dailyWeight(d);
     if (prev) {
-      const diff = Math.round((d.weight - prev[1]) * 10) / 10;
+      const diff = Math.round((today - prev[1]) * 10) / 10;
       sub = diff === 0 ? `Same as ${relDay(prev[0])}` : `${diff > 0 ? "+" : "−"}${Math.abs(diff).toFixed(1)} kg since ${relDay(prev[0])}`;
-    } else sub = "Tap to change";
+    } else sub = am === null ? "Add your day weight too" : pm === null ? "Add your night weight later" : "Tap to change";
   } else {
     main = sel === todayKey() ? "Log today's weight" : "Log weight for this day";
     sub = prev ? `Last: ${kg(prev[1])} (${relDay(prev[0])})` : "Optional";
@@ -1525,7 +1546,7 @@ async function runSpending() {
 // Weight line chart with a kg scale on the left.
 function weightChart(pts, a, b, period) {
   const W = 340, H = 170, L = 40, R = 10, T = 18, B = 22;
-  const vals = pts.map((p) => p[1]);
+  const vals = pts.flatMap((p) => [p[1], ...(p[2] ? [p[2].am, p[2].pm].filter((v) => v !== null) : [])]);
   let lo = Math.min(...vals), hi = Math.max(...vals);
   if (hi - lo < 2) { const mid = (hi + lo) / 2; lo = mid - 1; hi = mid + 1; }
   const step = [0.5, 1, 2, 5, 10, 20].find((s) => (hi - lo) / s <= 4) || 20;
@@ -1543,9 +1564,10 @@ function weightChart(pts, a, b, period) {
   return `<svg class="w-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight chart">
     ${ticks.map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${(y(v) + 3.5).toFixed(1)}" text-anchor="end" class="ax">${v % 1 ? v.toFixed(1) : v}</text>`).join("")}
     ${xl.map(([k, l]) => `<text x="${x(k).toFixed(1)}" y="${H - 6}" text-anchor="middle" class="ax">${l}</text>`).join("")}
+    ${pts.flatMap((p) => (p[2] && p[2].am !== null && p[2].pm !== null ? [p[2].am, p[2].pm] : []).map((v) => `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.5" fill="var(--purple-2)" opacity=".45"/>`)).join("")}
     ${pts.length > 1 ? `<path d="${line}" fill="none" stroke="var(--purple)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>` : ""}
-    ${pts.map((p) => `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="${period === "90" ? 3 : 4}" fill="var(--card)" stroke="var(--purple)" stroke-width="2"><title>${esc(prettyDate(p[0]))}: ${p[1].toFixed(1)} kg</title></circle>`).join("")}
-    ${period === "week" ? pts.map((p) => `<text x="${x(p[0]).toFixed(1)}" y="${(y(p[1]) - 9).toFixed(1)}" text-anchor="middle" class="pv">${p[1].toFixed(1)}</text>`).join("") : ""}
+    ${pts.map((p) => `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="${period === "90" ? 3 : 4}" fill="var(--card)" stroke="var(--purple)" stroke-width="2"><title>${esc(prettyDate(p[0]))}: ${w1(p[1])} kg</title></circle>`).join("")}
+    ${period === "week" ? pts.map((p) => `<text x="${x(p[0]).toFixed(1)}" y="${(y(p[1]) - 9).toFixed(1)}" text-anchor="middle" class="pv">${w1(p[1])}</text>`).join("") : ""}
   </svg>`;
 }
 
@@ -1560,7 +1582,8 @@ async function runWeightStats() {
   let days;
   try { days = await loadRange(ymd(a), ymd(b)); } catch (e) { console.error(e); out.innerHTML = '<p class="muted">Couldn\'t load your readings. Check your connection.</p>'; return; }
   if (!$("#wsOut")) return;
-  const pts = days.filter(([, d]) => hasWeight(d)).map(([k, d]) => [k, d.weight]);
+  const mode = weightMode();
+  const pts = days.filter(([, d]) => hasWeight(d)).map(([k, d]) => [k, dailyWeight(d, mode), readings(d)]);
   // Change only uses readings inside this chart: latest minus first. With none or one reading it's 0.
   const first = pts[0], last = pts[pts.length - 1];
   const change = pts.length > 1 ? Math.round((last[1] - first[1]) * 10) / 10 : 0;
@@ -1569,14 +1592,14 @@ async function runWeightStats() {
   const avgW = pts.length ? pts.reduce((s, p) => s + p[1], 0) / pts.length : 0;
   out.innerHTML = `
     <div class="stat-row">
-      <div class="stat"><div class="k">Latest</div><div class="v">${pts.length ? `${last[1].toFixed(1)}<small>kg</small>` : "–"}</div></div>
+      <div class="stat"><div class="k">Latest</div><div class="v">${pts.length ? `${w1(last[1])}<small>kg</small>` : "–"}</div></div>
       <div class="stat"><div class="k">Change</div><div class="v">${change > 0 ? "+" : change < 0 ? "−" : ""}${Math.abs(change).toFixed(1)}<small>kg</small></div><div class="k2">${esc(changeFrom)}</div></div>
-      <div class="stat"><div class="k">Average</div><div class="v">${pts.length ? `${avgW.toFixed(1)}<small>kg</small>` : "–"}</div></div>
+      <div class="stat"><div class="k">Average</div><div class="v">${pts.length ? `${w1(avgW)}<small>kg</small>` : "–"}</div></div>
     </div>
     ${!pts.length ? `<p class="muted">No weight logged ${wstat.period === "week" ? "this week" : "in this period"} yet. Log it from the Weight card on the main screen.</p>` : `
     <div class="card-box">${weightChart(pts, a, b, wstat.period)}</div>
-    <ul class="top-foods" style="margin-top:12px">${pts.slice().reverse().slice(0, 14).map(([k, v]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}</span><span>${v.toFixed(1)} kg</span></li>`).join("")}</ul>
-    <p class="note">${pts.length} reading${pts.length === 1 ? "" : "s"} in this period. Change compares the first and latest weight in this chart.</p>`}`;
+    <ul class="top-foods w-list" style="margin-top:12px">${pts.slice().reverse().slice(0, 14).map(([k, v, r]) => `<li><span>${esc(prettyDate(k, { weekday: "short", day: "numeric", month: "short" }))}<small>${r.am !== null ? `Day ${w1(r.am)}` : ""}${r.am !== null && r.pm !== null ? " · " : ""}${r.pm !== null ? `Night ${w1(r.pm)}` : ""}</small></span><span>${w1(v)} kg</span></li>`).join("")}</ul>
+    <p class="note">${pts.length} day${pts.length === 1 ? "" : "s"} with a weight in this period. Each day counts as ${WMODE_TEXT[mode]}. Change compares the first and latest day in this chart.</p>`}`;
 }
 
 function renderStatTab(body) {
@@ -1586,6 +1609,7 @@ function renderStatTab(body) {
   if (stats.tab === "weight") {
     box.innerHTML = `
       ${seg(WPERIODS, wstat.period, "wsPeriod")}
+      <div class="chips w-modes" id="wsMode"><span>Each day counts as:</span>${WMODES.map(([k, l]) => `<button data-mode="${k}" class="${k === weightMode() ? "on" : ""}">${l}</button>`).join("")}</div>
       <div class="spend-hero"><div class="spend-nav"><button id="wsPrev" aria-label="Previous">‹</button><span id="wsLabel"></span><button id="wsNext" aria-label="Next">›</button></div></div>
       <div id="wsOut"></div>`;
     $("#wsPeriod", box).addEventListener("click", (e) => {
@@ -1594,6 +1618,15 @@ function renderStatTab(body) {
       wstat.period = b.dataset.period; wstat.offset = 0;
       box.querySelectorAll("#wsPeriod button").forEach((x) => x.classList.toggle("on", x === b));
       runWeightStats();
+    });
+    $("#wsMode", box).addEventListener("click", (e) => {
+      const b = e.target.closest("[data-mode]");
+      if (!b || b.dataset.mode === weightMode()) return;
+      box.querySelectorAll("#wsMode button").forEach((x) => x.classList.toggle("on", x === b));
+      updateProfile({ weightMode: b.dataset.mode }).catch(() => {});
+      if (state.profile) state.profile.weightMode = b.dataset.mode;
+      runWeightStats();
+      renderWeight();
     });
     $("#wsPrev", box).addEventListener("click", () => { wstat.offset--; runWeightStats(); });
     $("#wsNext", box).addEventListener("click", () => { if (wstat.offset < 0) { wstat.offset++; runWeightStats(); } });
@@ -1946,25 +1979,32 @@ const VIEWS = {
   weight(body) {
     const sel = ymd(state.selectedDate);
     const d = dayData(sel);
+    const { am, pm } = readings(d);
     $("#sheetTitle").textContent = "Weight";
     renderMealTabs(false);
     const prev = previousWeight(sel);
+    const ph = prev ? esc(w1(prev[1])) : "e.g. 55.0";
     body.innerHTML = `
-      <div class="field"><label for="wIn">Weight on ${esc(sel === todayKey() ? "today" : prettyDate(sel, { weekday: "short", day: "numeric", month: "short", year: "numeric" }))} (kg)</label>
-        <input id="wIn" type="number" inputmode="decimal" min="20" max="400" step="0.1" placeholder="${prev ? esc(String(prev[1])) : "e.g. 55.0"}" value="${hasWeight(d) ? esc(d.weight.toFixed(1)) : ""}"></div>
-      ${prev ? `<p class="note">Last reading: ${esc(kg(prev[1]))} on ${esc(prettyDate(prev[0]))}.</p>` : ""}
+      <p class="note" style="margin-top:0">${esc(sel === todayKey() ? "Today" : prettyDate(sel, { weekday: "short", day: "numeric", month: "short", year: "numeric" }))}. Log one or both; leave a box empty if you only weighed once.</p>
+      <div class="form">
+        <div class="field"><label for="wAm">Day (kg)</label><input id="wAm" type="number" inputmode="decimal" min="20" max="400" step="0.1" placeholder="${ph}" value="${am !== null ? esc(am.toFixed(1)) : ""}"></div>
+        <div class="field"><label for="wPm">Night (kg)</label><input id="wPm" type="number" inputmode="decimal" min="20" max="400" step="0.1" placeholder="${ph}" value="${pm !== null ? esc(pm.toFixed(1)) : ""}"></div>
+      </div>
+      ${prev ? `<p class="note">Last weight: ${esc(kg(prev[1]))} on ${esc(prettyDate(prev[0]))}.</p>` : ""}
       <button class="primary" id="wSave">Save weight</button>
-      ${hasWeight(d) ? '<button class="secondary danger" id="wDel">Remove this reading</button>' : ""}
+      ${am !== null || pm !== null ? '<button class="secondary danger" id="wDel">Remove both readings</button>' : ""}
       <button class="secondary" data-act="weight-stats">See weight charts</button>`;
-    setTimeout(() => $("#wIn")?.focus(), 250);
+    setTimeout(() => $(new Date().getHours() >= 17 && sel === todayKey() ? "#wPm" : "#wAm")?.focus(), 250);
     $("#wSave", body).addEventListener("click", () => {
-      const v = num($("#wIn", body).value);
-      if (!(v >= 20 && v <= 400)) return toast("Enter your weight in kg");
-      setWeight(sel, v).catch(() => {});
+      const read = (id) => { const t = $("#" + id, body).value.trim(); if (t === "") return null; const v = num(t); return v >= 20 && v <= 400 ? v : undefined; };
+      const a = read("wAm"), p = read("wPm");
+      if (a === undefined || p === undefined) return toast("Enter your weight in kg (20–400)");
+      if (a === null && p === null && am === null && pm === null) return toast("Enter your weight");
+      setWeights(sel, a, p).catch(() => {});
       closeSheet();
-      toast("Weight saved");
+      toast(a === null && p === null ? "Removed" : "Weight saved");
     });
-    $("#wDel", body)?.addEventListener("click", () => { setWeight(sel, null).catch(() => {}); closeSheet(); toast("Removed"); });
+    $("#wDel", body)?.addEventListener("click", () => { setWeights(sel, null, null).catch(() => {}); closeSheet(); toast("Removed"); });
   },
 
   history(body) {
@@ -2775,7 +2815,7 @@ async function restoreBackup(b) {
     const days = {};
     for (const [date, day] of Object.entries(v.days)) {
       days[date] = Object.fromEntries(MEALS.map((m) => [m.id, Array.isArray(day?.[m.id]) ? day[m.id] : []]));
-      if (typeof day?.weight === "number" && day.weight > 0) days[date].weight = day.weight;
+      for (const k of ["weight", "wAm", "wPm"]) if (typeof day?.[k] === "number" && day[k] > 0) days[date][k] = day[k];
     }
     const path = monthPath(month);
     await queueWrite(path, () => fb.setDoc(fb.doc(path), { month, days, updatedAt: new Date().toISOString() }, { merge: true }));
