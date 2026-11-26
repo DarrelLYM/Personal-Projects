@@ -388,9 +388,59 @@ function renderHeader() {
   $("#title").textContent = sel === todayKey()
     ? (name ? `Hi, ${name}` : "Food Log")
     : state.selectedDate.toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-  $("#dateJump").value = sel;
-  const min = new Date(); min.setFullYear(min.getFullYear() - HISTORY_YEARS);
-  $("#dateJump").min = ymd(min);
+  $("#todayPill").hidden = sel === todayKey();
+}
+
+// ---------- Calendar (month view, opened from the calendar button) ----------
+const cal = { y: 0, m: 0 };
+const calMin = () => { const d = today0(); d.setFullYear(d.getFullYear() - HISTORY_YEARS); return d; };
+const calMax = () => { const d = today0(); d.setFullYear(d.getFullYear() + 1); return d; };
+function goToDate(d) {
+  state.selectedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  renderAll();
+}
+// Reads a typed date: DD/MM/YYYY, DD/MM/YY or DD/MM (this year); also 8 or 4 digits with no separators.
+function parseTypedDate(text) {
+  const t = String(text || "").trim();
+  let m = t.match(/^(\d{1,2})[\/\-. ](\d{1,2})(?:[\/\-. ](\d{2}|\d{4}))?$/);
+  if (!m) { const dg = t.replace(/\D/g, ""); if (dg.length === 8) m = [0, dg.slice(0, 2), dg.slice(2, 4), dg.slice(4)]; else if (dg.length === 4) m = [0, dg.slice(0, 2), dg.slice(2, 4)]; }
+  if (!m) return null;
+  const day = +m[1], mon = +m[2];
+  let y = m[3] ? +m[3] : new Date().getFullYear();
+  if (y < 100) y += 2000;
+  const d = new Date(y, mon - 1, day);
+  return d.getDate() === day && d.getMonth() === mon - 1 ? d : null;
+}
+
+async function renderCalendarMonth() {
+  const box = $("#calGrid");
+  if (!box) return;
+  const { y, m } = cal;
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+  $("#calLabel").textContent = first.toLocaleDateString("en-SG", { month: "long", year: "numeric" });
+  $("#calPrev").disabled = new Date(y, m, 0) < calMin();
+  $("#calNext").disabled = new Date(y, m + 1, 1) > calMax();
+  const lead = (first.getDay() + 6) % 7; // weeks start on Monday
+  const sel = ymd(state.selectedDate), today = todayKey();
+  const paint = (days) => {
+    const byDate = Object.fromEntries(days);
+    let cells = "";
+    for (let i = 0; i < lead; i++) cells += "<span></span>";
+    for (let n = 1; n <= last.getDate(); n++) {
+      const d = new Date(y, m, n), k = ymd(d);
+      const day = byDate[k] || {};
+      const meals = ["breakfast", "lunch", "dinner"];
+      const has = MEALS.some((ml) => (day[ml.id] || []).length);
+      const out = d < calMin() || d > calMax();
+      cells += `<button class="cal-day${k === sel ? " sel" : ""}${k === today ? " today" : ""}${k > today ? " future" : ""}" data-cal="${k}"${out ? " disabled" : ""} aria-label="${esc(prettyDate(k, { weekday: "long", day: "numeric", month: "long", year: "numeric" }))}"><b>${n}</b>${has ? `<span class="dots">${meals.map((id) => `<i class="${(day[id] || []).length ? "on" : ""}"></i>`).join("")}</span>` : ""}</button>`;
+    }
+    box.innerHTML = cells;
+  };
+  paint([]);
+  try {
+    const days = await loadRange(ymd(first), ymd(last));
+    if (cal.y === y && cal.m === m && $("#calGrid")) paint(days);
+  } catch { /* offline and not cached: dates still work, just without dots */ }
 }
 
 function renderWeek() {
@@ -2053,6 +2103,48 @@ const VIEWS = {
     $("#wDel", body)?.addEventListener("click", () => { setWeights(sel, null, null).catch(() => {}); closeSheet(); toast("Removed"); });
   },
 
+  calendar(body) {
+    $("#sheetTitle").textContent = "Go to a date";
+    renderMealTabs(false);
+    cal.y = state.selectedDate.getFullYear(); cal.m = state.selectedDate.getMonth();
+    body.innerHTML = `
+      <form class="cal-type" id="calForm">
+        <input id="calInput" inputmode="numeric" autocomplete="off" placeholder="Type a date: DD/MM/YYYY" aria-label="Type a date, day month year" maxlength="10">
+        <button type="submit" class="cal-go">Go</button>
+      </form>
+      <p class="form-msg err" id="calMsg" hidden></p>
+      <div class="cal-head">
+        <button class="round" id="calPrev" aria-label="Previous month">‹</button>
+        <b id="calLabel"></b>
+        <button class="round" id="calNext" aria-label="Next month">›</button>
+      </div>
+      <div class="cal-dow">${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => `<span>${d}</span>`).join("")}</div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-foot">
+        <span class="cal-key"><span class="dots"><i class="on"></i><i></i><i class="on"></i></span> Breakfast · Lunch · Dinner</span>
+        <button class="chip-btn" id="calToday">Today</button>
+      </div>`;
+    const input = $("#calInput", body), msg = $("#calMsg", body);
+    // Adds the slashes while typing digits (phone number pads have no "/").
+    input.addEventListener("input", () => {
+      const dg = input.value.replace(/\D/g, "").slice(0, 8);
+      input.value = dg.length > 4 ? `${dg.slice(0, 2)}/${dg.slice(2, 4)}/${dg.slice(4)}` : dg.length > 2 ? `${dg.slice(0, 2)}/${dg.slice(2)}` : dg;
+      msg.hidden = true;
+    });
+    $("#calForm", body).addEventListener("submit", (e) => {
+      e.preventDefault();
+      const d = parseTypedDate(input.value);
+      if (!d) { msg.textContent = "Type the date as day/month/year, e.g. 25/11/2026."; msg.hidden = false; return; }
+      if (d < calMin() || d > calMax()) { const full = (d) => prettyDate(ymd(d), { day: "numeric", month: "short", year: "numeric" }); msg.textContent = `Pick a date between ${full(calMin())} and ${full(calMax())}.`; msg.hidden = false; return; }
+      goToDate(d); closeSheet();
+    });
+    $("#calPrev", body).addEventListener("click", () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } renderCalendarMonth(); });
+    $("#calNext", body).addEventListener("click", () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } renderCalendarMonth(); });
+    $("#calGrid", body).addEventListener("click", (e) => { const b = e.target.closest("[data-cal]"); if (b) { goToDate(parseYmd(b.dataset.cal)); closeSheet(); } });
+    $("#calToday", body).addEventListener("click", () => { goToDate(today0()); closeSheet(); });
+    renderCalendarMonth();
+  },
+
   history(body) {
     $("#sheetTitle").textContent = "History";
     renderMealTabs(false);
@@ -2490,7 +2582,8 @@ function bindEvents() {
   });
   $("#prevWeek").addEventListener("click", () => { state.selectedDate.setDate(state.selectedDate.getDate() - 7); renderAll(); });
   $("#nextWeek").addEventListener("click", () => { state.selectedDate.setDate(state.selectedDate.getDate() + 7); renderAll(); });
-  $("#dateJump").addEventListener("change", (e) => { if (e.target.value) { state.selectedDate = parseYmd(e.target.value); renderAll(); } });
+  $("#calBtn").addEventListener("click", () => openSheet(null, "calendar"));
+  $("#todayPill").addEventListener("click", () => goToDate(today0()));
   $("#profileBtn").addEventListener("click", () => openSheet(null, "profile"));
 
   $("#weight").addEventListener("click", (e) => { if (e.target.closest("[data-act-main=weight]")) openSheet(null, "weight"); });

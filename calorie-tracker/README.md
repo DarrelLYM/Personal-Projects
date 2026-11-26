@@ -9,7 +9,7 @@ A free calorie tracker for food eaten in Singapore. It runs in any phone browser
 
 ## Features
 - Sign in with a username or email, plus a "Forgot password?" email link
-- Progress bars for Calories, Protein, Carbs, Fat and Sugar; week date strip; jump to any date in the last 10 years
+- Progress bars for Calories, Protein, Carbs, Fat and Sugar; week date strip (Mon–Sun) with dots for breakfast, lunch and dinner; a month calendar (calendar button) where you can tap a day or type a date (DD/MM/YYYY), up to 10 years back; "Back to today" when viewing another day
 - 4 optional meals: Breakfast, Lunch, Dinner, Supper
 - **Scan:** live barcode scanning on the phone. The camera image is never saved or uploaded; only the barcode number is looked up. Unknown products can be entered once and are recognised on the next scan.
 - **Food search:** about 3,000 foods with official data (HPB's SG FoodID for hawker and everyday food, McDonald's, KFC, Subway and 7-Eleven Singapore, Ya Kun drinks), packaged products from Open Food Facts, and labelled estimates for chains that publish nothing. Understands local names ("cai fan", "kopi siew dai", "CKT") and small typos.
