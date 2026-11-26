@@ -477,7 +477,7 @@ function renderMeals() {
 // Stored on the day as wAm (day) and wPm (night). Readings saved before there were two count as the day reading.
 // Each day's figure for charts and comparisons depends on the chosen mode: the average of the two (or the
 // only one logged), the lower, or the higher.
-const WMODES = [["avg", "Average"], ["low", "Lowest"], ["high", "Highest"]];
+const WMODES = [["avg", "Avg"], ["low", "Low"], ["high", "High"]];
 const WMODE_TEXT = { avg: "the average of day and night (or the only one logged)", low: "the lowest of day and night", high: "the highest of day and night" };
 const weightMode = () => (WMODES.some(([k]) => k === state.profile?.weightMode) ? state.profile.weightMode : "avg");
 const validW = (v) => typeof v === "number" && v > 0;
