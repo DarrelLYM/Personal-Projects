@@ -404,7 +404,7 @@ function renderWeek() {
     const day = dayData(key);
     const has = MEALS.some((m) => day[m.id].length);
     html += `<button class="day${key === sel ? " sel" : ""}${key === today ? " today" : ""}" data-date="${key}" aria-label="${d.toLocaleDateString("en-SG", { weekday: "long", day: "numeric", month: "long" })}"${key === sel ? ' aria-current="date"' : ""}>
-      <span class="dow">${dows[d.getDay()]}</span><span class="dnum">${d.getDate()}</span>${has ? '<span class="dot"></span>' : ""}</button>`;
+      <span class="dow">${dows[d.getDay()]}</span><span class="dnum">${d.getDate()}</span>${has ? `<span class="dots" title="Breakfast, lunch, dinner">${["breakfast", "lunch", "dinner"].map((id) => `<i class="${day[id].length ? "on" : ""}"></i>`).join("")}</span>` : ""}</button>`;
   }
   $("#days").innerHTML = html;
 }

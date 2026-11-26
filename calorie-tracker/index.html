@@ -115,8 +115,12 @@
   .day .dnum { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
   .day.sel { background: rgba(255,255,255,.9); color: var(--purple-deep); }
   .day.today:not(.sel) .dnum { text-decoration: underline; text-underline-offset: 4px; }
-  .day .dot { position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: #fff; }
-  .day.sel .dot { background: var(--purple); }
+  /* Breakfast · lunch · dinner: filled = logged, hollow = not logged. */
+  .day .dots { position: absolute; bottom: 3px; display: flex; gap: 2.5px; }
+  .day .dots i { width: 5px; height: 5px; flex: none; border-radius: 50%; border: 1.2px solid #fff; box-sizing: border-box; }
+  .day .dots i.on { background: #fff; }
+  .day.sel .dots i { border-color: var(--purple); }
+  .day.sel .dots i.on { background: var(--purple); }
   .bars { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr; gap: 8px; margin-top: 18px; }
   .bar { min-width: 0; }
   .bar .track { height: 12px; border-radius: 99px; background: var(--track); overflow: hidden; }
