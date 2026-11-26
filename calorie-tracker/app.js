@@ -377,12 +377,15 @@ const priceField = (id, val = "") => `<div class="field price-field"><label for=
 // Weeks run Monday to Sunday.
 function weekStart(d) { const s = new Date(d); s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); s.setHours(0, 0, 0, 0); return s; }
 
+// A profile photo is only shown if it's a plain base64 image (nothing else can ride along in it).
+const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+
 function renderHeader() {
   const name = state.profile?.username || "";
   $("#profileInitial").textContent = name ? name.charAt(0).toUpperCase() : "·";
   const photo = state.profile?.photo;
   const btn = $("#profileBtn");
-  btn.style.backgroundImage = photo && /^data:image\/(jpeg|png|webp);base64,/.test(photo) ? `url("${photo}")` : "";
+  btn.style.backgroundImage = photo && PHOTO_RE.test(photo) ? `url("${photo}")` : "";
   btn.classList.toggle("has-photo", !!btn.style.backgroundImage);
   const sel = ymd(state.selectedDate);
   $("#title").textContent = sel === todayKey()
@@ -2172,7 +2175,7 @@ const VIEWS = {
     renderMealTabs(false);
     const g = goals();
     const f = (id, label, val) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" inputmode="decimal" min="0" value="${esc(val)}"></div>`;
-    const hasPhoto = !!p.photo;
+    const hasPhoto = !!p.photo && PHOTO_RE.test(p.photo);
     body.innerHTML = `
       <div class="photo-row">
         <div class="avatar-lg"${hasPhoto ? ` style="background-image:url('${esc(p.photo)}')"` : ""}>${hasPhoto ? "" : esc((p.username || "?").charAt(0).toUpperCase())}</div>
@@ -2460,6 +2463,7 @@ const AUTH_ERRORS = {
   "auth/too-many-requests": "Too many tries. Wait a few minutes, or reset your password.",
   "auth/network-request-failed": "No internet connection. Check your connection and try again.",
   "auth/operation-not-allowed": "Email sign-in isn't turned on yet in Firebase. See the setup steps in the README.",
+  "auth/admin-restricted-operation": "New accounts are switched off for this app. Ask the person who runs it to create one for you.",
 };
 const authError = (e) => AUTH_ERRORS[e?.code] || e?.message || "Something went wrong. Try again.";
 

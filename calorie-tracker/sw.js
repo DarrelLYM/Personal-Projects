@@ -1,6 +1,6 @@
 // Keeps the app shell available offline. Network first, so updates show up straight away.
 // Firebase keeps its own offline copy of your data.
-const CACHE = "gct-v27";
+const CACHE = "gct-v28";
 const SHELL = ["./", "./index.html", "./app.js", "./data/foods.json", "./data/packaged.json", "./firebase-config.js", "./manifest.json",
   "./vendor/zxing-browser.js", "./icons/icon-192.png", "./icons/apple-touch-icon.png"];
 self.addEventListener("install", (e) => {
