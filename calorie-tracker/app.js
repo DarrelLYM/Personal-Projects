@@ -634,7 +634,7 @@ function renderSummary() {
     ["Sodium", fmt(t.sodium), `/ ${fmt(g.sodium)}mg`],
   ];
   const dayEntries = MEALS.flatMap((m) => dayData(ymd(state.selectedDate))[m.id]);
-  if (dayEntries.some(hasPrice)) cells.push(["Spent", money(spentOf(dayEntries)), ""]);
+  cells.push(["Spent", money(spentOf(dayEntries)), ""]);
   $("#summary").innerHTML = `<h3>Day summary</h3><div class="grid">${cells.map(([k, v, s]) => `<div class="cell"><div class="k">${k}</div><div class="v">${v} <small>${s}</small></div></div>`).join("")}</div>`;
 }
 
